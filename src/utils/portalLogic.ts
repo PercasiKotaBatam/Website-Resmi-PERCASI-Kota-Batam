@@ -18,7 +18,7 @@ export interface AthleteFilterOptions {
   district?: BatamDistrict | 'Semua';
 }
 
-export type RatingSortField = 'rating' | 'name' | 'percasiId';
+export type RatingSortField = 'rating' | 'name';
 export type SortDirection = 'asc' | 'desc';
 
 export const TITLE_OPTIONS: TitleCode[] = [
@@ -81,8 +81,6 @@ export function filterAthletes(
     if (normalizedQuery) {
       const searchable = [
         athlete.fullName,
-        athlete.percasiId,
-        athlete.fideId ?? '',
         athlete.club,
         athlete.district,
         athlete.title,
@@ -110,10 +108,7 @@ export function sortRatings(
       if (diff !== 0) return diff * multiplier;
       return a.fullName.localeCompare(b.fullName, 'id');
     }
-    if (sortBy === 'name') {
-      return a.fullName.localeCompare(b.fullName, 'id') * multiplier;
-    }
-    return a.percasiId.localeCompare(b.percasiId, 'id') * multiplier;
+    return a.fullName.localeCompare(b.fullName, 'id') * multiplier;
   });
 }
 
@@ -354,13 +349,13 @@ export function parseStandingsJson(jsonText: string): StandingsParseResult {
 
 export function generateSampleCsvTemplate(): string {
   return [
-    'Peringkat,Gelar,Nama,Klub,Poin,Buchholz,PerubahanRating,IDPercasi',
-    '1,NM,Godfrid Harry Mollyson Siregar,Semanggi Chess Club,6.5,31.5,14,IDN-BTM-17001',
-    '2,NM,Nurdin Simanjuntak,-,6.0,30.0,10,IDN-BTM-15004',
-    '3,NM,Sahat Sitanggang,-,5.5,29.5,8,IDN-BTM-16009',
-    '4,MP,Suhandri,-,5.0,28.0,5,IDN-BTM-18012',
-    '5,Non-Gelar,Hadi Hartoni Sembiring,-,4.5,27.5,6,IDN-BTM-19018',
-    '6,Non-Gelar,Jon Toni,Semanggi Chess Club,4.0,25.0,4,IDN-BTM-20021',
+    'Peringkat,Gelar,Nama,Klub,Poin,Buchholz,PerubahanRating',
+    '1,NM,Godfrid Harry Mollyson Siregar,Semanggi Chess Club,6.5,31.5,14',
+    '2,NM,Nurdin Simanjuntak,-,6.0,30.0,10',
+    '3,NM,Sahat Sitanggang,-,5.5,29.5,8',
+    '4,MP,Suhandri,-,5.0,28.0,5',
+    '5,Non-Gelar,Hadi Hartoni Sembiring,-,4.5,27.5,6',
+    '6,Non-Gelar,Jon Toni,Semanggi Chess Club,4.0,25.0,4',
   ].join('\n');
 }
 
@@ -632,13 +627,13 @@ export function parseStandingsExcelBuffer(
 
 export function generateSampleExcelBytes(): Uint8Array {
   const aoa = [
-    ['Peringkat', 'Gelar', 'Nama', 'Klub', 'Poin', 'Buchholz', 'PerubahanRating', 'IDPercasi'],
-    [1, 'NM', 'Godfrid Harry Mollyson Siregar', 'Semanggi Chess Club', 6.5, 31.5, 14, 'IDN-BTM-17001'],
-    [2, 'NM', 'Nurdin Simanjuntak', '-', 6.0, 30.0, 10, 'IDN-BTM-15004'],
-    [3, 'NM', 'Sahat Sitanggang', '-', 5.5, 29.5, 8, 'IDN-BTM-16009'],
-    [4, 'MP', 'Suhandri', '-', 5.0, 28.0, 5, 'IDN-BTM-18012'],
-    [5, 'Non-Gelar', 'Hadi Hartoni Sembiring', '-', 4.5, 27.5, 6, 'IDN-BTM-19018'],
-    [6, 'Non-Gelar', 'Jon Toni', 'Semanggi Chess Club', 4.0, 25.0, 4, 'IDN-BTM-20021'],
+    ['Peringkat', 'Gelar', 'Nama', 'Klub', 'Poin', 'Buchholz', 'PerubahanRating'],
+    [1, 'NM', 'Godfrid Harry Mollyson Siregar', 'Semanggi Chess Club', 6.5, 31.5, 14],
+    [2, 'NM', 'Nurdin Simanjuntak', '-', 6.0, 30.0, 10],
+    [3, 'NM', 'Sahat Sitanggang', '-', 5.5, 29.5, 8],
+    [4, 'MP', 'Suhandri', '-', 5.0, 28.0, 5],
+    [5, 'Non-Gelar', 'Hadi Hartoni Sembiring', '-', 4.5, 27.5, 6],
+    [6, 'Non-Gelar', 'Jon Toni', 'Semanggi Chess Club', 4.0, 25.0, 4],
   ];
   const worksheet = XLSX.utils.aoa_to_sheet(aoa);
   const workbook = XLSX.utils.book_new();
@@ -736,8 +731,6 @@ export interface AthleteDetailProfile {
   key: string;
   fullName: string;
   title: string;
-  percasiId?: string;
-  fideId?: string;
   fed?: string;
   category: string;
   club: string;
@@ -873,10 +866,7 @@ export function buildAthleteDetailProfile(
 
   tournaments.forEach((tournament) => {
     const standing = tournament.standings.find(
-      (s) =>
-        (registeredAthlete?.percasiId &&
-          s.percasiId === registeredAthlete.percasiId) ||
-        normalizeAthleteName(s.name) === targetKey
+      (s) => normalizeAthleteName(s.name) === targetKey
     );
 
     if (standing) {
@@ -978,8 +968,6 @@ export function buildAthleteDetailProfile(
     key: targetKey,
     fullName: registeredAthlete?.fullName ?? fallbackDisplayName,
     title: fallbackTitle,
-    percasiId: registeredAthlete?.percasiId,
-    fideId: registeredAthlete?.fideId,
     fed: matchedStanding?.fed ?? (registeredAthlete ? 'INA' : undefined),
     category:
       registeredAthlete?.category ??

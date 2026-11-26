@@ -164,11 +164,6 @@ export function AthleteDetailView({
         </button>
 
         <div className="flex items-center gap-3">
-          {profile.percasiId && (
-            <span className="font-mono-tabular text-xs font-semibold text-slate-500">
-              ID PERCASI: {profile.percasiId}
-            </span>
-          )}
           {isAdminMode && profile.registeredAthlete && (
             <button
               type="button"
@@ -201,12 +196,9 @@ export function AthleteDetailView({
                   {profile.category}
                 </span>
                 {profile.federationStatus && (
-                  <>
-                    <span aria-hidden="true" className="text-slate-300">
-                      ·
-                    </span>
-                    <span>{profile.federationStatus}</span>
-                  </>
+                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                    {profile.federationStatus}
+                  </span>
                 )}
                 {profile.fed && (
                   <>
@@ -238,11 +230,6 @@ export function AthleteDetailView({
                         : 'Kota Batam'}
                   </span>
                 </span>
-                {profile.fideId && (
-                  <span className="font-mono-tabular">
-                    FIDE ID: <strong className="text-slate-900">{profile.fideId}</strong>
-                  </span>
-                )}
                 {profile.birthYear && (
                   <span className="font-mono-tabular">
                     Tahun Lahir:{' '}
@@ -265,19 +252,19 @@ export function AthleteDetailView({
               <div className="px-3">
                 <p className="text-[11px] font-semibold text-slate-500">Standard</p>
                 <p className="font-mono-tabular mt-1 text-xl font-extrabold text-[#0F2342]">
-                  {profile.ratings.standard}
+                  {profile.ratings.standard > 0 ? profile.ratings.standard : '-'}
                 </p>
               </div>
               <div className="px-3">
                 <p className="text-[11px] font-semibold text-slate-500">Rapid</p>
                 <p className="font-mono-tabular mt-1 text-xl font-extrabold text-[#0F2342]">
-                  {profile.ratings.rapid}
+                  {profile.ratings.rapid > 0 ? profile.ratings.rapid : '-'}
                 </p>
               </div>
               <div className="px-3">
                 <p className="text-[11px] font-semibold text-slate-500">Blitz</p>
                 <p className="font-mono-tabular mt-1 text-xl font-extrabold text-[#0F2342]">
-                  {profile.ratings.blitz}
+                  {profile.ratings.blitz > 0 ? profile.ratings.blitz : '-'}
                 </p>
               </div>
             </div>

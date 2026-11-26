@@ -28,12 +28,10 @@ export function MemberFormModal({
   onSave,
 }: MemberFormModalProps) {
   const [fullName, setFullName] = useState('');
-  const [percasiId, setPercasiId] = useState('');
-  const [fideId, setFideId] = useState('');
   const [title, setTitle] = useState<TitleCode>('Non-Gelar');
   const [category, setCategory] = useState<AthleteCategory>('Senior Putra');
   const [gender, setGender] = useState<'Putra' | 'Putri'>('Putra');
-  const [birthYear, setBirthYear] = useState('2000');
+  const [birthYear, setBirthYear] = useState('');
   const [club, setClub] = useState('');
   const [district, setDistrict] = useState<BatamDistrict>('Batam Kota');
   const [standard, setStandard] = useState('1600');
@@ -48,12 +46,10 @@ export function MemberFormModal({
     if (!isOpen) return;
     if (editingAthlete) {
       setFullName(editingAthlete.fullName);
-      setPercasiId(editingAthlete.percasiId);
-      setFideId(editingAthlete.fideId ?? '');
       setTitle(editingAthlete.title);
       setCategory(editingAthlete.category);
       setGender(editingAthlete.gender);
-      setBirthYear(String(editingAthlete.birthYear));
+      setBirthYear(editingAthlete.birthYear ? String(editingAthlete.birthYear) : '');
       setClub(editingAthlete.club);
       setDistrict(editingAthlete.district);
       setStandard(String(editingAthlete.ratings.standard));
@@ -63,8 +59,6 @@ export function MemberFormModal({
       setPhotoUrl(editingAthlete.photoUrl);
     } else {
       setFullName('');
-      setPercasiId(`IDN-BTM-${new Date().getFullYear().toString().slice(-2)}${Math.floor(100 + Math.random() * 900)}`);
-      setFideId('');
       setTitle('Non-Gelar');
       setCategory('Senior Putra');
       setGender('Putra');
@@ -111,15 +105,10 @@ export function MemberFormModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = fullName.trim();
-    const trimmedPercasiId = percasiId.trim();
     const trimmedClub = club.trim();
 
     if (!trimmedName) {
       setError('Nama lengkap atlet wajib diisi.');
-      return;
-    }
-    if (!trimmedPercasiId) {
-      setError('Nomor ID PERCASI wajib diisi.');
       return;
     }
     if (!trimmedClub) {
@@ -127,38 +116,33 @@ export function MemberFormModal({
       return;
     }
 
-    const parsedBirth = Number.parseInt(birthYear, 10);
+    const trimmedBirth = birthYear.trim();
+    const parsedBirth = trimmedBirth ? Number.parseInt(trimmedBirth, 10) : undefined;
     const parsedStd = Number.parseInt(standard, 10);
     const parsedRpd = Number.parseInt(rapid, 10);
     const parsedBlz = Number.parseInt(blitz, 10);
 
     if (
-      Number.isNaN(parsedBirth) ||
-      parsedBirth < 1935 ||
-      parsedBirth > 2022
+      parsedBirth !== undefined &&
+      (Number.isNaN(parsedBirth) || parsedBirth < 1935 || parsedBirth > 2022)
     ) {
       setError('Tahun lahir tidak valid (1935–2022).');
       return;
     }
 
-    if (
-      [parsedStd, parsedRpd, parsedBlz].some(
-        (r) => Number.isNaN(r) || r < 800 || r > 2900
-      )
-    ) {
-      setError('Nilai rating Standard, Rapid, dan Blitz harus antara 800–2900.');
+    const isValidRating = (r: number) => !Number.isNaN(r) && (r === 0 || (r >= 800 && r <= 2900));
+    if (![parsedStd, parsedRpd, parsedBlz].every(isValidRating)) {
+      setError('Nilai rating Standard, Rapid, dan Blitz harus 0 (non-rating) atau antara 800–2900.');
       return;
     }
 
     const payload: Athlete = {
       id: editingAthlete?.id ?? `ath-${Date.now()}`,
       fullName: trimmedName,
-      percasiId: trimmedPercasiId,
-      fideId: fideId.trim() || undefined,
       title,
       category,
       gender,
-      birthYear: parsedBirth,
+      ...(parsedBirth !== undefined ? { birthYear: parsedBirth } : {}),
       club: trimmedClub,
       district,
       photoUrl,
@@ -170,9 +154,7 @@ export function MemberFormModal({
       bio:
         bio.trim() ||
         `Atlet catur terdaftar Pengkot PERCASI Kota Batam wilayah ${district}.`,
-      federationStatus: category.startsWith('Junior')
-        ? 'Pembinaan Daerah'
-        : 'Aktif',
+      federationStatus: 'Atlet',
       tournamentHistory: editingAthlete?.tournamentHistory ?? [],
     };
 
@@ -270,7 +252,7 @@ export function MemberFormModal({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
+            <div className="sm:col-span-2">
               <label
                 htmlFor="member-fullname"
                 className="mb-1 block text-xs font-semibold text-slate-700"
@@ -285,41 +267,6 @@ export function MemberFormModal({
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Contoh: Aditya Pratama"
                 className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#0F2342] focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="member-percasi-id"
-                className="mb-1 block text-xs font-semibold text-slate-700"
-              >
-                Nomor ID PERCASI *
-              </label>
-              <input
-                id="member-percasi-id"
-                type="text"
-                required
-                value={percasiId}
-                onChange={(e) => setPercasiId(e.target.value)}
-                placeholder="IDN-BTM-26001"
-                className="font-mono-tabular h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#0F2342] focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="member-fide-id"
-                className="mb-1 block text-xs font-semibold text-slate-700"
-              >
-                FIDE ID (Opsional)
-              </label>
-              <input
-                id="member-fide-id"
-                type="text"
-                value={fideId}
-                onChange={(e) => setFideId(e.target.value)}
-                placeholder="7145001"
-                className="font-mono-tabular h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#0F2342] focus:outline-none"
               />
             </div>
 
@@ -456,7 +403,7 @@ export function MemberFormModal({
               <input
                 id="member-std"
                 type="number"
-                min={800}
+                min={0}
                 max={2900}
                 value={standard}
                 onChange={(e) => setStandard(e.target.value)}
@@ -473,7 +420,7 @@ export function MemberFormModal({
               <input
                 id="member-rpd"
                 type="number"
-                min={800}
+                min={0}
                 max={2900}
                 value={rapid}
                 onChange={(e) => setRapid(e.target.value)}
@@ -490,7 +437,7 @@ export function MemberFormModal({
               <input
                 id="member-blz"
                 type="number"
-                min={800}
+                min={0}
                 max={2900}
                 value={blitz}
                 onChange={(e) => setBlitz(e.target.value)}

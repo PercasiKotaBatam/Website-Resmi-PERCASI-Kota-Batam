@@ -11,12 +11,10 @@ export const HERO_IMAGE_URL = './src/assets/images/hero_kejurkot_batam_179515676
 export const NEWS_JUNIOR_IMAGE_URL = './src/assets/images/news_pembinaan_junior_1795156766513.jpg';
 export const NEWS_OPEN_IMAGE_URL = './src/assets/images/news_turnamen_open_1795156764325.jpg';
 
-export const SEED_ATHLETES: Athlete[] = [
+const BASE_SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-01',
     fullName: 'Godfrid Harry Mollyson Siregar',
-    percasiId: 'IDN-BTM-17001',
-    fideId: '7106420',
     title: 'NM',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -25,7 +23,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Sagulung',
     ratings: { standard: 2131, rapid: 2243, blitz: 2125 },
     bio: 'National Master dari Semanggi Chess Club, Kecamatan Sagulung dengan spesialisasi permainan catur cepat dan taktis. Pemuncak daftar peringkat Rapid dan Standard Pengkot PERCASI Kota Batam.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -41,8 +39,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-02',
     fullName: 'Nurdin Simanjuntak',
-    percasiId: 'IDN-BTM-15004',
-    fideId: '7103912',
     title: 'NM',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -51,7 +47,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Sekupang',
     ratings: { standard: 2062, rapid: 1960, blitz: 1955 },
     bio: 'National Master senior asal Kecamatan Sekupang yang tangguh pada nomor catur klasik (Standard) dengan penguasaan teknik permainan akhir yang presisi.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -67,8 +63,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-03',
     fullName: 'Sahat Sitanggang',
-    percasiId: 'IDN-BTM-16009',
-    fideId: '7105118',
     title: 'NM',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -77,7 +71,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Nongsa',
     ratings: { standard: 2015, rapid: 2033, blitz: 2045 },
     bio: 'National Master asal Kecamatan Nongsa yang dikenal agresif di kontrol waktu Blitz dan Rapid serta aktif membina pecatur Kota Batam.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -93,8 +87,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-04',
     fullName: 'Suhandri',
-    percasiId: 'IDN-BTM-18012',
-    fideId: '7112405',
     title: 'MP',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -103,7 +95,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Nongsa',
     ratings: { standard: 1992, rapid: 1992, blitz: 1992 },
     bio: 'PERCASI Master dari Kecamatan Nongsa dengan performa seimbang di seluruh kontrol waktu Standard, Rapid, dan Blitz.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -119,7 +111,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-05',
     fullName: 'Hadi Hartoni Sembiring',
-    percasiId: 'IDN-BTM-19018',
     title: 'Non-Gelar',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -128,7 +119,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Sagulung',
     ratings: { standard: 1983, rapid: 1983, blitz: 1983 },
     bio: 'Pecatur senior asal Kecamatan Sagulung yang konsisten bersaing di papan atas turnamen tingkat Kota Batam dan Kepulauan Riau.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -144,7 +135,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-06',
     fullName: 'Jon Toni',
-    percasiId: 'IDN-BTM-20021',
     title: 'Non-Gelar',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -153,7 +143,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Sagulung',
     ratings: { standard: 1890, rapid: 1892, blitz: 1881 },
     bio: 'Atlet senior Semanggi Chess Club, Kecamatan Sagulung dengan repertoar pembukaan solid dan daya juang tinggi di turnamen sistem Swiss.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -169,7 +159,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-07',
     fullName: 'Junny Purnama Khoh',
-    percasiId: 'IDN-BTM-21015',
     title: 'Non-Gelar',
     category: 'Senior Putri',
     gender: 'Putri',
@@ -178,7 +167,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Lubuk Baja',
     ratings: { standard: 1884, rapid: 1880, blitz: 1880 },
     bio: 'Pecatur putri senior dari Kecamatan Lubuk Baja yang aktif memperkuat tim catur Kota Batam dalam kejuaraan beregu maupun perorangan.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -194,7 +183,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-08',
     fullName: 'Aldriyanto Syarif',
-    percasiId: 'IDN-BTM-22009',
     title: 'Non-Gelar',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -203,7 +191,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Batu Aji',
     ratings: { standard: 1833, rapid: 1880, blitz: 1880 },
     bio: 'Pecatur aktif Semanggi Chess Club asal Kecamatan Batu Aji dengan kekuatan menonjol pada nomor catur cepat Rapid dan Blitz.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -219,7 +207,6 @@ export const SEED_ATHLETES: Athlete[] = [
   {
     id: 'ath-09',
     fullName: "Lu'Lu'Ul Ilmi",
-    percasiId: 'IDN-BTM-24006',
     title: 'Non-Gelar',
     category: 'Senior Putri',
     gender: 'Putri',
@@ -228,7 +215,7 @@ export const SEED_ATHLETES: Athlete[] = [
     district: 'Batam Kota',
     ratings: { standard: 1618, rapid: 1618, blitz: 1618 },
     bio: 'Atlet putri asal Kecamatan Batam Kota yang aktif mengikuti turnamen resmi Pengkot PERCASI Kota Batam.',
-    federationStatus: 'Pembinaan Daerah',
+    federationStatus: 'Atlet',
     tournamentHistory: [
       {
         tournamentName: 'Kejurkot Catur Kota Batam 2026',
@@ -680,6 +667,96 @@ export const FIRDAUS_CUP_STANDINGS: StandingEntry[] = [
   { rank: 90, sNo: 38, title: 'Non-Gelar', name: 'Erwin Sentosa', club: '-', rating: '-', fed: 'INA', category: 'Senior', points: 0, pointsDisplay: '0', de: 0, buchholz: 0, bhDisplay: '0', sb: 0, ps: 0, ratingChange: 0 },
   { rank: 90, sNo: 72, title: 'Non-Gelar', name: 'Rahadani', club: '-', rating: '-', fed: 'INA', category: 'Senior', points: 0, pointsDisplay: '0', de: 0, buchholz: 0, bhDisplay: '0', sb: 0, ps: 0, ratingChange: 0 },
 ];
+
+function normalizeSeedAthleteName(name: string): string {
+  return name
+    .trim()
+    .replace(
+      /,\s*(GM|IM|FM|WFM|WIM|WGM|NM|MP|PM|WNM|WN|PNP|FA|AGM|AIM|AFM|ACM)$/i,
+      ''
+    )
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function stripSeedTitleSuffix(name: string): string {
+  return name
+    .trim()
+    .replace(
+      /,\s*(GM|IM|FM|WFM|WIM|WGM|NM|MP|PM|WNM|WN|PNP|FA|AGM|AIM|AFM|ACM)$/i,
+      ''
+    )
+    .trim();
+}
+
+function buildSeedAthletes(
+  baseAthletes: Athlete[],
+  standings: StandingEntry[]
+): Athlete[] {
+  const seen = new Set(baseAthletes.map((a) => normalizeSeedAthleteName(a.fullName)));
+  const extras: Athlete[] = [];
+
+  standings.forEach((entry, index) => {
+    const key = normalizeSeedAthleteName(entry.name);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+
+    const rawCategory = (entry.category ?? 'Senior').trim();
+    const isPutri = rawCategory === 'Putri';
+    const isJunior = rawCategory === 'Junior';
+    const numericRating =
+      typeof entry.rating === 'number' && Number.isFinite(entry.rating) && entry.rating > 0
+        ? entry.rating
+        : 0;
+
+    const rawClub = (entry.club ?? '-').trim();
+    const district: Athlete['district'] =
+      rawClub === 'Kec. Nongsa'
+        ? 'Nongsa'
+        : rawClub === 'Kec. Sagulung'
+          ? 'Sagulung'
+          : 'Batam Kota';
+    const club =
+      rawClub.startsWith('Kec.') || !rawClub ? '-' : rawClub;
+
+    const rawTitle = String(entry.title ?? 'Non-Gelar').trim().toUpperCase();
+    const title: Athlete['title'] =
+      rawTitle === 'NM'
+        ? 'NM'
+        : rawTitle === 'MP' || rawTitle === 'PM'
+          ? 'MP'
+          : 'Non-Gelar';
+
+    extras.push({
+      id: `ath-fc-${String(entry.sNo ?? index + 1).padStart(3, '0')}`,
+      fullName: stripSeedTitleSuffix(entry.name),
+      title,
+      category: isPutri
+        ? 'Senior Putri'
+        : isJunior
+          ? 'Junior U-18'
+          : 'Senior Putra',
+      gender: isPutri ? 'Putri' : 'Putra',
+      club,
+      district,
+      ratings: {
+        standard: numericRating,
+        rapid: numericRating,
+        blitz: numericRating,
+      },
+      bio: 'Atlet catur terdaftar Pengkot PERCASI Kota Batam (Peserta Firdaus Cup 2026).',
+      federationStatus: 'Atlet',
+      tournamentHistory: [],
+    });
+  });
+
+  return [...baseAthletes, ...extras];
+}
+
+export const SEED_ATHLETES: Athlete[] = buildSeedAthletes(
+  BASE_SEED_ATHLETES,
+  FIRDAUS_CUP_STANDINGS
+);
 
 export const SEED_TOURNAMENTS: Tournament[] = [
   {

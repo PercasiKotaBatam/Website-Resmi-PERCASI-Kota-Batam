@@ -43,7 +43,7 @@ export function AthleteProfileModal({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <span className="font-mono-tabular text-xs font-semibold text-slate-500">
-            Kartu Profil Atlet · {athlete.percasiId}
+            Kartu Profil Atlet · PERCASI Kota Batam
           </span>
           <div className="flex items-center gap-2">
             {isAdminMode && (
@@ -106,16 +106,11 @@ export function AthleteProfileModal({
                     {athlete.club} · Kecamatan {athlete.district}, Kota Batam
                   </span>
                 </p>
-                <p className="font-mono-tabular">
-                  ID PERCASI: <strong className="text-slate-900">{athlete.percasiId}</strong>
-                  {athlete.fideId ? (
-                    <>
-                      {' '}
-                      · FIDE ID: <strong className="text-slate-900">{athlete.fideId}</strong>
-                    </>
-                  ) : null}{' '}
-                  · Tahun Lahir: <strong className="text-slate-900">{athlete.birthYear}</strong>
-                </p>
+                {athlete.birthYear && (
+                  <p className="font-mono-tabular">
+                    Tahun Lahir: <strong className="text-slate-900">{athlete.birthYear}</strong>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -125,19 +120,19 @@ export function AthleteProfileModal({
             <div>
               <p className="text-xs font-semibold text-slate-500">Standard</p>
               <p className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#0F2342]">
-                {athlete.ratings.standard}
+                {athlete.ratings.standard > 0 ? athlete.ratings.standard : '-'}
               </p>
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500">Rapid</p>
               <p className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#0F2342]">
-                {athlete.ratings.rapid}
+                {athlete.ratings.rapid > 0 ? athlete.ratings.rapid : '-'}
               </p>
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500">Blitz</p>
               <p className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#0F2342]">
-                {athlete.ratings.blitz}
+                {athlete.ratings.blitz > 0 ? athlete.ratings.blitz : '-'}
               </p>
             </div>
           </div>

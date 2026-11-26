@@ -7,10 +7,11 @@ import {
   FIRDAUS_CUP_ROUND_6_PAIRINGS,
   FIRDAUS_CUP_ROUND_7_PAIRINGS,
   FIRDAUS_CUP_STANDINGS,
+  SEED_ATHLETES,
   SEED_PORTAL_DATA,
 } from '../data/seedData';
-import type { PortalData } from '../types/chess';
-import { validatePortalBackup } from './portalLogic';
+import type { Athlete, PortalData } from '../types/chess';
+import { normalizeAthleteName, validatePortalBackup } from './portalLogic';
 
 const STORAGE_KEY = 'percasi_batam_portal_v3';
 
@@ -37,11 +38,17 @@ const REMOVED_NEWS_IDS = new Set([
 ]);
 
 export function migratePortalData(data: PortalData): PortalData {
-  return {
-    ...data,
-    athletes: data.athletes.map((a) => ({
-      ...a,
-      tournamentHistory: a.tournamentHistory
+  const cleanedAthletes: Athlete[] = data.athletes.map((a) => {
+    const legacy = a as Athlete & { percasiId?: string; fideId?: string };
+    const { percasiId: _percasiId, fideId: _fideId, ...rest } = legacy;
+    return {
+      ...rest,
+      ratings: rest.ratings ?? { standard: 0, rapid: 0, blitz: 0 },
+      federationStatus: 'Atlet',
+      tournamentHistory: (Array.isArray(rest.tournamentHistory)
+        ? rest.tournamentHistory
+        : []
+      )
         .filter(
           (rec) => rec.tournamentName !== 'Batam Rapid Open — Piala Wali Kota 2026'
         )
@@ -51,7 +58,19 @@ export function migratePortalData(data: PortalData): PortalData {
             ? { ...rec, category: 'Catur Cepat' }
             : rec
         ),
-    })),
+    };
+  });
+
+  const existingNames = new Set(
+    cleanedAthletes.map((a) => normalizeAthleteName(a.fullName))
+  );
+  const missingSeedAthletes = SEED_ATHLETES.filter(
+    (seedAth) => !existingNames.has(normalizeAthleteName(seedAth.fullName))
+  );
+
+  return {
+    ...data,
+    athletes: [...cleanedAthletes, ...missingSeedAthletes],
     tournaments: data.tournaments
       .filter((t) => !REMOVED_TOURNAMENT_IDS.has(t.id))
       .map((t) => {

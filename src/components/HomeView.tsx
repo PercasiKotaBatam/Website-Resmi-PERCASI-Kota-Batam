@@ -53,7 +53,7 @@ export function HomeView({
     if (!q) return null;
     const matchedAthletes = athletes
       .filter((a) =>
-        [a.fullName, a.percasiId, a.fideId ?? '', a.club, a.district]
+        [a.fullName, a.club, a.district]
           .join(' ')
           .toLowerCase()
           .includes(q)
@@ -126,7 +126,7 @@ export function HomeView({
                 htmlFor="home-quick-search"
                 className="mb-2 block text-xs font-semibold text-slate-300"
               >
-                Pencarian Cepat Atlet, ID PERCASI, atau Turnamen
+                Pencarian Cepat Atlet atau Turnamen
               </label>
               <div className="relative flex items-center">
                 <Search
@@ -138,7 +138,7 @@ export function HomeView({
                   type="search"
                   value={quickQuery}
                   onChange={(e) => setQuickQuery(e.target.value)}
-                  placeholder="Cari nama atlet, ID PERCASI, kecamatan, atau turnamen..."
+                  placeholder="Cari nama atlet, klub, kecamatan, atau turnamen..."
                   className="h-12 w-full rounded-md border border-slate-300 bg-white pr-28 pl-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-400 focus:outline-none"
                 />
                 {quickQuery ? (
@@ -199,7 +199,7 @@ export function HomeView({
                                   </span>
                                 </div>
                                 <span className="font-mono-tabular text-xs font-bold text-[#0F2342]">
-                                  STD {ath.ratings.standard}
+                                  {ath.ratings.standard > 0 ? `STD ${ath.ratings.standard}` : ath.federationStatus}
                                 </span>
                               </button>
                             ))}
@@ -460,10 +460,10 @@ export function HomeView({
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-mono-tabular text-base font-extrabold text-[#0F2342]">
-                        {athlete.ratings[topTab]}
+                        {athlete.ratings[topTab] > 0 ? athlete.ratings[topTab] : '-'}
                       </p>
-                      <p className="font-mono-tabular text-[11px] text-slate-400">
-                        {athlete.percasiId}
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {athlete.federationStatus}
                       </p>
                     </div>
                   </button>
@@ -580,10 +580,10 @@ export function HomeView({
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-mono-tabular text-base font-extrabold text-[#0F2342]">
-                        {athlete.ratings[topTab]}
+                        {athlete.ratings[topTab] > 0 ? athlete.ratings[topTab] : '-'}
                       </p>
-                      <p className="font-mono-tabular text-[11px] text-slate-400">
-                        {athlete.percasiId}
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {athlete.federationStatus}
                       </p>
                     </div>
                   </button>

@@ -51,12 +51,10 @@ export interface AthleteTournamentRecord {
 export interface Athlete {
   id: string;
   fullName: string;
-  percasiId: string;
-  fideId?: string;
   title: TitleCode;
   category: AthleteCategory;
   gender: 'Putra' | 'Putri';
-  birthYear: number;
+  birthYear?: number;
   club: string;
   district: BatamDistrict;
   photoUrl?: string;
@@ -66,7 +64,7 @@ export interface Athlete {
     blitz: number;
   };
   bio: string;
-  federationStatus: 'Aktif' | 'Pembinaan Daerah';
+  federationStatus: 'Atlet' | 'Aktif' | 'Pembinaan Daerah';
   tournamentHistory: AthleteTournamentRecord[];
 }
 

@@ -101,7 +101,7 @@ export function MembersView({
             htmlFor="member-search"
             className="mb-1.5 block text-xs font-semibold text-slate-700"
           >
-            Cari Nama / ID PERCASI / Klub
+            Cari Nama / Klub / Kecamatan
           </label>
           <div className="relative">
             <Search
@@ -113,7 +113,7 @@ export function MembersView({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Contoh: Godfrid, IDN-BTM-17001, Lubuk Baja..."
+              placeholder="Contoh: Godfrid, Semanggi, Batam Kota..."
               className="h-10 w-full rounded-md border border-slate-300 bg-white pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F2342] focus:outline-none"
             />
           </div>
@@ -241,6 +241,9 @@ export function MembersView({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <TitleBadge title={athlete.title} />
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        {athlete.federationStatus}
+                      </span>
                       <span className="text-xs text-slate-500">
                         {athlete.category}
                       </span>
@@ -254,10 +257,6 @@ export function MembersView({
                         {athlete.fullName}
                       </button>
                     </h2>
-                    <p className="font-mono-tabular mt-0.5 text-xs text-slate-500">
-                      ID: {athlete.percasiId}
-                      {athlete.fideId ? ` · FIDE: ${athlete.fideId}` : ''}
-                    </p>
                   </div>
                 </div>
 
@@ -275,7 +274,7 @@ export function MembersView({
                       Standard
                     </p>
                     <p className="font-mono-tabular mt-0.5 text-sm font-bold text-[#0F2342]">
-                      {athlete.ratings.standard}
+                      {athlete.ratings.standard > 0 ? athlete.ratings.standard : '-'}
                     </p>
                   </div>
                   <div>
@@ -283,7 +282,7 @@ export function MembersView({
                       Rapid
                     </p>
                     <p className="font-mono-tabular mt-0.5 text-sm font-bold text-[#0F2342]">
-                      {athlete.ratings.rapid}
+                      {athlete.ratings.rapid > 0 ? athlete.ratings.rapid : '-'}
                     </p>
                   </div>
                   <div>
@@ -291,7 +290,7 @@ export function MembersView({
                       Blitz
                     </p>
                     <p className="font-mono-tabular mt-0.5 text-sm font-bold text-[#0F2342]">
-                      {athlete.ratings.blitz}
+                      {athlete.ratings.blitz > 0 ? athlete.ratings.blitz : '-'}
                     </p>
                   </div>
                 </div>

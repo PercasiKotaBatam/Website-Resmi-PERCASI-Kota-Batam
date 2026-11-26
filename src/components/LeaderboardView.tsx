@@ -99,7 +99,7 @@ export function LeaderboardView({
             htmlFor="leaderboard-search"
             className="mb-1.5 block text-xs font-semibold text-slate-700"
           >
-            Cari Atlet atau ID PERCASI
+            Cari Atlet, Klub, atau Kecamatan
           </label>
           <div className="relative">
             <Search
@@ -111,7 +111,7 @@ export function LeaderboardView({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ketik nama pemain, klub, atau ID PERCASI..."
+              placeholder="Ketik nama pemain, klub, atau kecamatan..."
               className="h-10 w-full rounded-md border border-slate-300 bg-white pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F2342] focus:outline-none"
             />
           </div>
@@ -154,16 +154,6 @@ export function LeaderboardView({
                 <th scope="col" className="px-4 py-3.5">
                   <button
                     type="button"
-                    onClick={() => handleSort('percasiId')}
-                    className="inline-flex items-center gap-1 hover:text-[#0F2342]"
-                  >
-                    <span>ID PERCASI</span>
-                    <ArrowUpDown className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </th>
-                <th scope="col" className="px-4 py-3.5">
-                  <button
-                    type="button"
                     onClick={() => handleSort('name')}
                     className="inline-flex items-center gap-1 hover:text-[#0F2342]"
                   >
@@ -196,7 +186,7 @@ export function LeaderboardView({
               {rankedAthletes.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-4 py-10 text-center text-sm text-slate-500"
                   >
                     Tidak ada atlet yang ditemukan untuk filter yang dipilih.
@@ -210,9 +200,6 @@ export function LeaderboardView({
                   >
                     <td className="font-mono-tabular px-4 py-3 font-bold text-slate-500">
                       #{idx + 1}
-                    </td>
-                    <td className="font-mono-tabular px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
-                      {athlete.percasiId}
                     </td>
                     <td className="px-4 py-3">
                       <button
@@ -239,7 +226,7 @@ export function LeaderboardView({
                       {athlete.category}
                     </td>
                     <td className="font-mono-tabular px-4 py-3 text-right text-base font-extrabold text-[#0F2342]">
-                      {athlete.ratings[activeTab]}
+                      {athlete.ratings[activeTab] > 0 ? athlete.ratings[activeTab] : '-'}
                     </td>
                   </tr>
                 ))

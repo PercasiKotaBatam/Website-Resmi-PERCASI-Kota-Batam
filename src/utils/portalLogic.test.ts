@@ -39,8 +39,6 @@ const SAMPLE_ATHLETES: Athlete[] = [
   {
     id: 'a1',
     fullName: 'Godfrid Harry Mollyson Siregar',
-    percasiId: 'IDN-BTM-17001',
-    fideId: '7106420',
     title: 'NM',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -49,14 +47,12 @@ const SAMPLE_ATHLETES: Athlete[] = [
     district: 'Sagulung',
     ratings: { standard: 2131, rapid: 2243, blitz: 2125 },
     bio: 'National Master Batam.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [],
   },
   {
     id: 'a2',
     fullName: 'Suhandri',
-    percasiId: 'IDN-BTM-18012',
-    fideId: '7112405',
     title: 'MP',
     category: 'Senior Putra',
     gender: 'Putra',
@@ -65,13 +61,12 @@ const SAMPLE_ATHLETES: Athlete[] = [
     district: 'Nongsa',
     ratings: { standard: 1992, rapid: 1992, blitz: 1992 },
     bio: 'PERCASI Master Batam.',
-    federationStatus: 'Aktif',
+    federationStatus: 'Atlet',
     tournamentHistory: [],
   },
   {
     id: 'a3',
     fullName: "Lu'Lu'Ul Ilmi",
-    percasiId: 'IDN-BTM-24006',
     title: 'Non-Gelar',
     category: 'Senior Putri',
     gender: 'Putri',
@@ -80,7 +75,7 @@ const SAMPLE_ATHLETES: Athlete[] = [
     district: 'Sagulung',
     ratings: { standard: 1618, rapid: 1618, blitz: 1618 },
     bio: 'Atlet putri Batam.',
-    federationStatus: 'Pembinaan Daerah',
+    federationStatus: 'Atlet',
     tournamentHistory: [],
   },
 ];
@@ -89,11 +84,11 @@ test('filterAthletes filters by title, category, district, and search query', ()
   assert.equal(filterAthletes(SAMPLE_ATHLETES, { title: 'NM' }).length, 1);
   assert.equal(filterAthletes(SAMPLE_ATHLETES, { category: 'Senior Putri' }).length, 1);
   assert.equal(filterAthletes(SAMPLE_ATHLETES, { district: 'Nongsa' }).length, 1);
-  assert.equal(filterAthletes(SAMPLE_ATHLETES, { query: '7112405' })[0]?.id, 'a2');
+  assert.equal(filterAthletes(SAMPLE_ATHLETES, { query: 'nongsa' })[0]?.id, 'a2');
   assert.equal(filterAthletes(SAMPLE_ATHLETES, { query: 'godfrid' })[0]?.id, 'a1');
 });
 
-test('sortRatings orders athletes accurately by rating, name, and percasiId', () => {
+test('sortRatings orders athletes accurately by rating and name', () => {
   const byRapidDesc = sortRatings(SAMPLE_ATHLETES, 'rapid', 'rating', 'desc');
   assert.deepEqual(
     byRapidDesc.map((a) => a.id),
@@ -301,7 +296,8 @@ test('buildAthleteDetailProfile computes White, Black, and Total W/D/L stats acc
   assert.equal(godfrid.matches.every((m) => m.timeControlCategory === 'Catur Cepat'), true);
 
   const jonathan = buildAthleteDetailProfile('Jonathan Charmian Vivaldy', SEED_ATHLETES, SEED_TOURNAMENTS);
-  assert.equal(jonathan.registeredAthlete, undefined);
+  assert.ok(jonathan.registeredAthlete);
+  assert.equal(jonathan.registeredAthlete.federationStatus, 'Atlet');
   assert.equal(jonathan.tournamentRating, 1896);
   assert.equal(jonathan.totalStats.games, 7);
   assert.equal(jonathan.totalStats.points, 6);
@@ -444,4 +440,41 @@ test('migratePortalData preserves admin edits on Firdaus Cup 2026', () => {
   assert.equal(migrated.tournaments[0]?.name, 'Firdaus Cup 2026 (Revisi)');
   assert.equal(migrated.tournaments[0]?.venue, 'Aula Baru Batam Center');
   assert.equal(migrated.tournaments[0]?.chiefArbiter, 'WN Wasit Baru, FA');
+});
+
+test('All 92 Firdaus Cup 2026 participants are registered as Atlet without ID PERCASI or FIDE ID', () => {
+  assert.equal(SEED_ATHLETES.length, 96);
+  const seedNames = new Set(SEED_ATHLETES.map((a) => normalizeAthleteName(a.fullName)));
+  FIRDAUS_CUP_STANDINGS.forEach((entry) => {
+    assert.ok(
+      seedNames.has(normalizeAthleteName(entry.name)),
+      `Missing Firdaus Cup participant in SEED_ATHLETES: ${entry.name}`
+    );
+  });
+
+  SEED_ATHLETES.forEach((athlete) => {
+    assert.equal(athlete.federationStatus, 'Atlet');
+    assert.equal('percasiId' in athlete, false);
+    assert.equal('fideId' in athlete, false);
+  });
+
+  const legacyCached = {
+    ...SEED_PORTAL_DATA,
+    athletes: [
+      {
+        ...SEED_ATHLETES[0]!,
+        percasiId: 'IDN-BTM-17001',
+        fideId: '7106420',
+        federationStatus: 'Aktif' as const,
+      } as Athlete,
+    ],
+  };
+
+  const migrated = migratePortalData(legacyCached);
+  assert.equal(migrated.athletes.length, 96);
+  migrated.athletes.forEach((athlete) => {
+    assert.equal(athlete.federationStatus, 'Atlet');
+    assert.equal('percasiId' in athlete, false);
+    assert.equal('fideId' in athlete, false);
+  });
 });

@@ -37,7 +37,13 @@ export function AdminLoginModal({
 
     fetch('/api/admin/status')
       .then(async (res) => {
-        if (!res.ok) throw new Error('Gagal memeriksa status autentikasi admin.');
+        if (!res.ok) {
+          throw new Error(
+            res.status === 404
+              ? 'Layanan autentikasi Mode Admin memerlukan server backend aktif (tidak tersedia pada hosting statis seperti GitHub Pages).'
+              : 'Gagal memeriksa status autentikasi admin.'
+          );
+        }
         return (await res.json()) as AdminStatusResponse;
       })
       .then((data) => {
@@ -45,10 +51,14 @@ export function AdminLoginModal({
           setConfigured(Boolean(data.configured));
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (!cancelled) {
           setConfigured(true);
-          setError('Tidak dapat terhubung ke layanan autentikasi admin.');
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Tidak dapat terhubung ke layanan autentikasi admin.'
+          );
         }
       })
       .finally(() => {

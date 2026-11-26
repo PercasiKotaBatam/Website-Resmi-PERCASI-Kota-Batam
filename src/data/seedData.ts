@@ -7,9 +7,9 @@ import type {
   Tournament,
 } from '../types/chess';
 
-export const HERO_IMAGE_URL = '/src/assets/images/hero_kejurkot_batam_1795156763743.jpg';
-export const NEWS_JUNIOR_IMAGE_URL = '/src/assets/images/news_pembinaan_junior_1795156766513.jpg';
-export const NEWS_OPEN_IMAGE_URL = '/src/assets/images/news_turnamen_open_1795156764325.jpg';
+export const HERO_IMAGE_URL = './src/assets/images/hero_kejurkot_batam_1795156763743.jpg';
+export const NEWS_JUNIOR_IMAGE_URL = './src/assets/images/news_pembinaan_junior_1795156766513.jpg';
+export const NEWS_OPEN_IMAGE_URL = './src/assets/images/news_turnamen_open_1795156764325.jpg';
 
 export const SEED_ATHLETES: Athlete[] = [
   {

@@ -187,16 +187,14 @@ export function TournamentsView({
                   <div className="flex flex-col justify-between rounded-md border border-slate-200 bg-slate-50 p-4 lg:col-span-5">
                     <div>
                       <p className="text-xs font-bold tracking-wide text-slate-700 uppercase">
-                        {trn.status === 'Akan Datang'
+                        {topThree.length === 0 && (trn.initialRankings?.length ?? 0) > 0
                           ? 'Unggulan Terdaftar'
-                          : 'Klasemen 3 Besar'}
+                          : trn.status === 'Akan Datang'
+                            ? 'Unggulan Terdaftar'
+                            : 'Klasemen 3 Besar'}
                       </p>
 
-                      {topThree.length === 0 ? (
-                        <p className="mt-3 text-xs text-slate-500">
-                          Daftar klasemen akan tersedia setelah hasil diunggah.
-                        </p>
-                      ) : (
+                      {topThree.length > 0 ? (
                         <div className="mt-3 divide-y divide-slate-200">
                           {topThree.map((entry) => (
                             <div
@@ -222,6 +220,38 @@ export function TournamentsView({
                             </div>
                           ))}
                         </div>
+                      ) : (trn.initialRankings?.length ?? 0) > 0 ? (
+                        <div className="mt-3 divide-y divide-slate-200">
+                          {(trn.initialRankings ?? []).slice(0, 3).map((entry) => {
+                            const rtg = entry.rating ?? entry.nationalRating;
+                            return (
+                              <div
+                                key={`${trn.id}-seed-${entry.sNo}-${entry.name}`}
+                                className="flex items-center justify-between gap-2 py-2 text-xs"
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="font-mono-tabular w-5 font-bold text-slate-500">
+                                    #{entry.sNo}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectAthlete(entry.name)}
+                                    className="truncate text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                  >
+                                    {entry.name}
+                                  </button>
+                                </div>
+                                <span className="font-mono-tabular font-bold text-[#0F2342] shrink-0">
+                                  {rtg && rtg !== '-' ? `Rtg ${rtg}` : entry.fed ?? 'INA'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-xs text-slate-500">
+                          Daftar klasemen akan tersedia setelah hasil diunggah.
+                        </p>
                       )}
                     </div>
 

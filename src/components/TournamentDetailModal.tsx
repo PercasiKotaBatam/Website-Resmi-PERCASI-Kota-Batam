@@ -27,7 +27,15 @@ export function TournamentDetailModal({
   const [selectedRound, setSelectedRound] = useState<number | 'all'>(1);
 
   useEffect(() => {
-    setActiveTab('standings');
+    if (
+      tournament &&
+      tournament.standings.length === 0 &&
+      (tournament.initialRankings?.length ?? 0) > 0
+    ) {
+      setActiveTab('initialRank');
+    } else {
+      setActiveTab('standings');
+    }
     if (tournament && tournament.pairings.length > 0) {
       const firstRound = Math.min(...tournament.pairings.map((p) => p.round));
       setSelectedRound(firstRound);
@@ -64,13 +72,16 @@ export function TournamentDetailModal({
     tournament.standings,
     tournament.initialRankings
   );
-  const hasExtendedInitialCols = initialRankings.some(
+  const hasDualRatingInitialCols = initialRankings.some(
     (row) =>
-      row.gender !== undefined ||
       row.nationalRating !== undefined ||
-      row.internationalRating !== undefined ||
-      row.clubCity !== undefined
+      row.internationalRating !== undefined
   );
+  const hasSingleRatingExtendedCols =
+    !hasDualRatingInitialCols &&
+    initialRankings.some(
+      (row) => row.gender !== undefined || row.clubCity !== undefined
+    );
 
   return (
     <div
@@ -373,7 +384,7 @@ export function TournamentDetailModal({
               <div className="rounded-md border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
                 Data peringkat awal belum dipublikasikan untuk turnamen ini.
               </div>
-            ) : hasExtendedInitialCols ? (
+            ) : hasDualRatingInitialCols ? (
               <div className="overflow-hidden rounded-md border border-slate-200">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[720px] border-collapse text-left text-xs">
@@ -428,6 +439,68 @@ export function TournamentDetailModal({
                           </td>
                           <td className="font-mono-tabular px-3 py-2 text-center text-slate-700">
                             {row.internationalRating ?? '-'}
+                          </td>
+                          <td className="font-mono-tabular px-3 py-2 text-center text-slate-600">
+                            {row.fed ?? '-'}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                            {row.clubCity ?? row.club ?? '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : hasSingleRatingExtendedCols ? (
+              <div className="overflow-hidden rounded-md border border-slate-200">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[660px] border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
+                        <th scope="col" className="w-16 px-3 py-2.5 text-center whitespace-nowrap">
+                          S. No.
+                        </th>
+                        <th scope="col" className="px-3 py-2.5">
+                          Name
+                        </th>
+                        <th scope="col" className="w-20 px-3 py-2.5 text-center whitespace-nowrap">
+                          Gender
+                        </th>
+                        <th scope="col" className="w-20 px-3 py-2.5 text-center whitespace-nowrap">
+                          Rating
+                        </th>
+                        <th scope="col" className="w-16 px-3 py-2.5 text-center whitespace-nowrap">
+                          FED
+                        </th>
+                        <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+                          Club/City
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {initialRankings.map((row, idx) => (
+                        <tr
+                          key={`init-rtg-${row.sNo}-${row.name}-${idx}`}
+                          className="hover:bg-slate-50"
+                        >
+                          <td className="font-mono-tabular px-3 py-2 text-center font-bold text-[#0F2342]">
+                            {row.sNo}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() => onSelectAthlete(row.name, tournament.id)}
+                              className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                            >
+                              {row.name}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2 text-center text-slate-700 whitespace-nowrap">
+                            {row.gender ?? '-'}
+                          </td>
+                          <td className="font-mono-tabular px-3 py-2 text-center text-slate-700">
+                            {row.rating ?? row.nationalRating ?? '-'}
                           </td>
                           <td className="font-mono-tabular px-3 py-2 text-center text-slate-600">
                             {row.fed ?? '-'}

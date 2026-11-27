@@ -344,7 +344,8 @@ export function UploadTournamentModal({
       if (
         validRows.length === 0 &&
         draftPairings.length === 0 &&
-        (!editingTournament || status !== 'Akan Datang')
+        !(editingTournament?.initialRankings && editingTournament.initialRankings.length > 0) &&
+        (!editingTournament || status === 'Selesai')
       ) {
         setFormError(
           'Masukkan minimal satu pemain pada tabel klasemen interaktif.'

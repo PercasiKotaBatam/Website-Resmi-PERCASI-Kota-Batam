@@ -23,6 +23,7 @@ import {
   validatePortalBackup,
 } from './portalLogic';
 import {
+  DARWIN_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_ROUND_1_PAIRINGS,
   FIRDAUS_CUP_ROUND_2_PAIRINGS,
@@ -359,8 +360,9 @@ test('migratePortalData purges stale duplicated pairings from cached Firdaus Cup
     ],
   });
   const suhandri = buildAthleteDetailProfile('ath-04', cleaned.athletes, cleaned.tournaments);
-  assert.equal(cleaned.tournaments.length, 1);
+  assert.equal(cleaned.tournaments.length, 2);
   assert.equal(cleaned.tournaments[0]?.id, 'trn-kejurkot-2026');
+  assert.equal(cleaned.tournaments[1]?.id, 'trn-darwin-cup-2026');
   assert.equal(cleaned.tournaments[0]?.pairings.length, 322);
   assert.equal(cleaned.tournaments[0]?.timeControlCategory, 'Catur Cepat');
   assert.equal(cleaned.news.length, 0);
@@ -373,13 +375,16 @@ test('migratePortalData purges stale duplicated pairings from cached Firdaus Cup
   assert.equal(suhandri.blackStats.losses, 0);
 });
 
-test('Only Firdaus Cup 2026 and zero news exist in seed, and 148-player initial rankings / round filter work accurately', () => {
-  assert.equal(SEED_TOURNAMENTS.length, 1);
+test('Firdaus Cup 2026 and Darwin Cup 2026 exist in seed with 148-player initial rankings and zero news', () => {
+  assert.equal(SEED_TOURNAMENTS.length, 2);
   assert.equal(SEED_TOURNAMENTS[0]?.id, 'trn-kejurkot-2026');
   assert.equal(SEED_TOURNAMENTS[0]?.name, 'Firdaus Cup 2026');
+  assert.equal(SEED_TOURNAMENTS[1]?.id, 'trn-darwin-cup-2026');
+  assert.equal(SEED_TOURNAMENTS[1]?.name, 'Darwin Cup 2026');
   assert.equal(SEED_NEWS.length, 0);
 
   assert.equal(FIRDAUS_CUP_INITIAL_RANKINGS.length, 148);
+  assert.equal(DARWIN_CUP_INITIAL_RANKINGS.length, 148);
   const customInitial = buildInitialRankings(
     FIRDAUS_CUP_STANDINGS,
     SEED_TOURNAMENTS[0]?.initialRankings
@@ -398,6 +403,16 @@ test('Only Firdaus Cup 2026 and zero news exist in seed, and 148-player initial 
   assert.equal(customInitial[147]?.sNo, 148);
   assert.equal(customInitial[147]?.name, 'Zulkifli Ritonga');
   assert.equal(customInitial[147]?.clubCity, 'Batam Kota');
+
+  const darwinInitial = buildInitialRankings([], SEED_TOURNAMENTS[1]?.initialRankings);
+  assert.equal(darwinInitial.length, 148);
+  assert.equal(darwinInitial[0]?.rating, 2243);
+  assert.equal(darwinInitial[2]?.name, 'Yanurisman Candra');
+  assert.equal(darwinInitial[2]?.rating, 2026);
+  assert.equal(darwinInitial[2]?.clubCity, 'Kepri - Tanjung Pinang');
+  assert.equal(darwinInitial[5]?.name, 'Jonathan Charmian Vivaldy');
+  assert.equal(darwinInitial[5]?.rating, 1896);
+  assert.equal(darwinInitial[5]?.internationalRating, undefined);
 
   const fallbackInitial = buildInitialRankings(FIRDAUS_CUP_STANDINGS);
   assert.equal(fallbackInitial.length, 92);
@@ -462,13 +477,19 @@ test('migratePortalData preserves admin edits on Firdaus Cup 2026', () => {
   assert.equal(migrated.tournaments[0]?.chiefArbiter, 'WN Wasit Baru, FA');
 });
 
-test('All 92 Firdaus Cup 2026 participants are registered as Atlet without ID PERCASI or FIDE ID', () => {
-  assert.equal(SEED_ATHLETES.length, 96);
+test('All Firdaus Cup & Darwin Cup participants are registered as Atlet without ID PERCASI or FIDE ID', () => {
+  assert.ok(SEED_ATHLETES.length >= 148);
   const seedNames = new Set(SEED_ATHLETES.map((a) => normalizeAthleteName(a.fullName)));
   FIRDAUS_CUP_STANDINGS.forEach((entry) => {
     assert.ok(
       seedNames.has(normalizeAthleteName(entry.name)),
       `Missing Firdaus Cup participant in SEED_ATHLETES: ${entry.name}`
+    );
+  });
+  DARWIN_CUP_INITIAL_RANKINGS.forEach((entry) => {
+    assert.ok(
+      seedNames.has(normalizeAthleteName(entry.name)),
+      `Missing Darwin Cup participant in SEED_ATHLETES: ${entry.name}`
     );
   });
 
@@ -491,7 +512,7 @@ test('All 92 Firdaus Cup 2026 participants are registered as Atlet without ID PE
   };
 
   const migrated = migratePortalData(legacyCached);
-  assert.equal(migrated.athletes.length, 96);
+  assert.equal(migrated.athletes.length, SEED_ATHLETES.length);
   migrated.athletes.forEach((athlete) => {
     assert.equal(athlete.federationStatus, 'Atlet');
     assert.equal('percasiId' in athlete, false);
@@ -499,27 +520,37 @@ test('All 92 Firdaus Cup 2026 participants are registered as Atlet without ID PE
   });
 });
 
-test('migratePortalData upgrades cached Firdaus Cup initialRankings to 148 players while preserving valid extra rounds', () => {
-  const cachedWithOldInitialAndRound8 = {
+test('migratePortalData upgrades cached Firdaus Cup and Darwin Cup initialRankings while preserving valid edits', () => {
+  const cachedWithManualDarwinAndRound8 = {
     ...SEED_PORTAL_DATA,
-    tournaments: SEED_PORTAL_DATA.tournaments.map((t) =>
-      t.id === 'trn-kejurkot-2026'
-        ? {
-            ...t,
-            initialRankings: undefined,
-            pairings: [
-              ...t.pairings,
-              { round: 8, board: 1, whiteName: 'Suhandri, PM', blackName: 'Nurdin Simanjuntak, NM', result: '1 - 0' },
-            ],
-          }
-        : t
-    ),
+    tournaments: [
+      {
+        ...SEED_PORTAL_DATA.tournaments[0]!,
+        initialRankings: undefined,
+        pairings: [
+          ...SEED_PORTAL_DATA.tournaments[0]!.pairings,
+          { round: 8, board: 1, whiteName: 'Suhandri, PM', blackName: 'Nurdin Simanjuntak, NM', result: '1 - 0' },
+        ],
+      },
+      {
+        ...SEED_PORTAL_DATA.tournaments[1]!,
+        id: 'trn-custom-darwin',
+        name: 'Darwin Cup 2026',
+        venue: 'Hotel Harmoni Batam',
+        initialRankings: [{ sNo: 1, name: 'Godfrid Harry Mollyson Siregar' }],
+        participantsCount: 10,
+      },
+    ],
   };
 
-  const migrated = migratePortalData(cachedWithOldInitialAndRound8);
+  const migrated = migratePortalData(cachedWithManualDarwinAndRound8);
   assert.equal(migrated.tournaments[0]?.initialRankings?.length, 148);
   assert.equal(migrated.tournaments[0]?.pairings.length, 323);
   assert.equal(migrated.tournaments[0]?.pairings.some((p) => p.round === 8), true);
+  assert.equal(migrated.tournaments[1]?.name, 'Darwin Cup 2026');
+  assert.equal(migrated.tournaments[1]?.venue, 'Hotel Harmoni Batam');
+  assert.equal(migrated.tournaments[1]?.participantsCount, 148);
+  assert.equal(migrated.tournaments[1]?.initialRankings?.length, 148);
 });
 
 test('parsePairingsExcelBuffer and mergeRoundPairings parse .xlsx/.xls Swiss-Manager round pairings and merge by round', () => {

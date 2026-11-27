@@ -690,9 +690,32 @@ function stripSeedTitleSuffix(name: string): string {
     .trim();
 }
 
+function mapClubCityToDistrictAndClub(clubCity?: string): {
+  district: Athlete['district'];
+  club: string;
+} {
+  const raw = (clubCity ?? '').trim();
+  const lower = raw.toLowerCase();
+  if (lower === 'sagulung') return { district: 'Sagulung', club: '-' };
+  if (lower === 'sekupang') return { district: 'Sekupang', club: '-' };
+  if (lower === 'batu aji') return { district: 'Batu Aji', club: '-' };
+  if (lower === 'lubuk baja') return { district: 'Lubuk Baja', club: '-' };
+  if (lower === 'batam kota') return { district: 'Batam Kota', club: '-' };
+  if (lower === 'sei beduk' || lower === 'sungai beduk') {
+    return { district: 'Sungai Beduk', club: '-' };
+  }
+  if (lower === 'bengkong') return { district: 'Bengkong', club: '-' };
+  if (lower === 'nongsa') return { district: 'Nongsa', club: '-' };
+  if (lower === 'junior' || lower === 'batu ampar' || !raw) {
+    return { district: 'Batam Kota', club: '-' };
+  }
+  return { district: 'Batam Kota', club: raw };
+}
+
 function buildSeedAthletes(
   baseAthletes: Athlete[],
-  standings: StandingEntry[]
+  standings: StandingEntry[],
+  initialRankings: InitialRankEntry[]
 ): Athlete[] {
   const seen = new Set(baseAthletes.map((a) => normalizeSeedAthleteName(a.fullName)));
   const extras: Athlete[] = [];
@@ -751,13 +774,45 @@ function buildSeedAthletes(
     });
   });
 
+  initialRankings.forEach((entry) => {
+    const key = normalizeSeedAthleteName(entry.name);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+
+    const isPutri = String(entry.gender ?? '').trim().toLowerCase() === 'putri';
+    const isJunior = String(entry.clubCity ?? '').trim().toLowerCase() === 'junior';
+    const rawRating = entry.rating ?? entry.nationalRating;
+    const numericRating =
+      typeof rawRating === 'number' && Number.isFinite(rawRating) && rawRating > 0
+        ? rawRating
+        : 0;
+    const { district, club } = mapClubCityToDistrictAndClub(entry.clubCity);
+
+    extras.push({
+      id: `ath-dc-${String(entry.sNo).padStart(3, '0')}`,
+      fullName: stripSeedTitleSuffix(entry.name),
+      title: 'Non-Gelar',
+      category: isPutri
+        ? 'Senior Putri'
+        : isJunior
+          ? 'Junior U-18'
+          : 'Senior Putra',
+      gender: isPutri ? 'Putri' : 'Putra',
+      club,
+      district,
+      ratings: {
+        standard: numericRating,
+        rapid: numericRating,
+        blitz: numericRating,
+      },
+      bio: 'Atlet catur terdaftar Pengkot PERCASI Kota Batam (Peserta Darwin Cup 2026).',
+      federationStatus: 'Atlet',
+      tournamentHistory: [],
+    });
+  });
+
   return [...baseAthletes, ...extras];
 }
-
-export const SEED_ATHLETES: Athlete[] = buildSeedAthletes(
-  BASE_SEED_ATHLETES,
-  FIRDAUS_CUP_STANDINGS
-);
 
 export const FIRDAUS_CUP_INITIAL_RANKINGS: InitialRankEntry[] = [
   { sNo: 1, name: 'Godfrid Harry Mollyson Siregar', gender: 'Putra', nationalRating: 2243, internationalRating: '-', fed: 'INA', clubCity: 'Sagulung' },
@@ -910,6 +965,22 @@ export const FIRDAUS_CUP_INITIAL_RANKINGS: InitialRankEntry[] = [
   { sNo: 148, name: 'Zulkifli Ritonga', gender: 'Putra', nationalRating: '-', internationalRating: '-', fed: 'INA', clubCity: 'Batam Kota' },
 ];
 
+export const DARWIN_CUP_INITIAL_RANKINGS: InitialRankEntry[] =
+  FIRDAUS_CUP_INITIAL_RANKINGS.map((row) => ({
+    sNo: row.sNo,
+    name: row.name,
+    gender: row.gender,
+    rating: row.nationalRating,
+    fed: row.fed,
+    clubCity: row.clubCity,
+  }));
+
+export const SEED_ATHLETES: Athlete[] = buildSeedAthletes(
+  BASE_SEED_ATHLETES,
+  FIRDAUS_CUP_STANDINGS,
+  DARWIN_CUP_INITIAL_RANKINGS
+);
+
 export const SEED_TOURNAMENTS: Tournament[] = [
   {
     id: 'trn-kejurkot-2026',
@@ -936,6 +1007,24 @@ export const SEED_TOURNAMENTS: Tournament[] = [
       ...FIRDAUS_CUP_ROUND_6_PAIRINGS,
       ...FIRDAUS_CUP_ROUND_7_PAIRINGS,
     ],
+  },
+  {
+    id: 'trn-darwin-cup-2026',
+    name: 'Darwin Cup 2026',
+    status: 'Akan Datang',
+    startDate: '2026',
+    endDate: '2026',
+    venue: 'Kota Batam',
+    timeControlCategory: 'Catur Cepat',
+    timeControlDetail: 'Sistem Swiss',
+    rounds: 7,
+    chiefArbiter: 'Pengkot PERCASI Kota Batam',
+    organizer: 'Pengkot PERCASI Kota Batam',
+    participantsCount: DARWIN_CUP_INITIAL_RANKINGS.length,
+    description: 'Daftar peserta dan peringkat awal resmi turnamen Darwin Cup 2026.',
+    initialRankings: DARWIN_CUP_INITIAL_RANKINGS,
+    standings: [],
+    pairings: [],
   },
 ];
 

@@ -1,4 +1,5 @@
 import {
+  DARWIN_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_ROUND_1_PAIRINGS,
   FIRDAUS_CUP_ROUND_2_PAIRINGS,
@@ -10,6 +11,7 @@ import {
   FIRDAUS_CUP_STANDINGS,
   SEED_ATHLETES,
   SEED_PORTAL_DATA,
+  SEED_TOURNAMENTS,
 } from '../data/seedData';
 import type { Athlete, PortalData } from '../types/chess';
 import { normalizeAthleteName, validatePortalBackup } from './portalLogic';
@@ -73,70 +75,104 @@ export function migratePortalData(data: PortalData): PortalData {
     (seedAth) => !existingNames.has(normalizeAthleteName(seedAth.fullName))
   );
 
+  const migratedTournaments = safeTournaments
+    .filter((t) => !REMOVED_TOURNAMENT_IDS.has(t.id))
+    .map((t) => {
+      const safeStandings = Array.isArray(t.standings) ? t.standings : [];
+      const safePairings = Array.isArray(t.pairings) ? t.pairings : [];
+      const isDarwinCup =
+        t.id === 'trn-darwin-cup-2026' || /\bdarwin\s*cup/i.test(t.name);
+
+      if (isDarwinCup) {
+        const needsDarwinInitialUpgrade =
+          !Array.isArray(t.initialRankings) ||
+          t.initialRankings.length < DARWIN_CUP_INITIAL_RANKINGS.length ||
+          t.initialRankings.some((row) => row.gender === undefined && row.clubCity === undefined);
+        return {
+          ...t,
+          participantsCount: Math.max(
+            t.participantsCount || 0,
+            DARWIN_CUP_INITIAL_RANKINGS.length
+          ),
+          initialRankings: needsDarwinInitialUpgrade
+            ? DARWIN_CUP_INITIAL_RANKINGS
+            : t.initialRankings,
+          standings: safeStandings,
+          pairings: safePairings,
+        };
+      }
+
+      if (t.id !== 'trn-kejurkot-2026') {
+        return {
+          ...t,
+          standings: safeStandings,
+          pairings: safePairings,
+        };
+      }
+      const isLegacyNameOrTc =
+        t.name === 'Kejurkot Catur Kota Batam 2026' ||
+        t.timeControlCategory === 'Standard';
+      const isLegacyVenueOrDate =
+        t.venue === 'Atrium Utama DC Mall Batam' ||
+        t.startDate === '14 Nov 2026';
+      return {
+        ...t,
+        name: isLegacyNameOrTc ? 'Firdaus Cup 2026' : t.name,
+        startDate: isLegacyVenueOrDate ? '5 Juli 2026' : t.startDate,
+        endDate: isLegacyVenueOrDate ? '5 Juli 2026' : t.endDate,
+        venue: isLegacyVenueOrDate
+          ? 'Kampung Tua Belian, Batam Center, Kota Batam'
+          : t.venue,
+        chiefArbiter:
+          t.chiefArbiter === 'WN Agus Kurniawan, FA' && isLegacyVenueOrDate
+            ? 'Aldriyanto Syarif, PNP, WNM'
+            : t.chiefArbiter,
+        timeControlCategory: isLegacyNameOrTc ? 'Catur Cepat' : t.timeControlCategory,
+        timeControlDetail: isLegacyNameOrTc
+          ? '10 menit + 3 detik'
+          : t.timeControlDetail,
+        description: isLegacyNameOrTc ? '' : t.description,
+        initialRankings:
+          !Array.isArray(t.initialRankings) ||
+          t.initialRankings.length < FIRDAUS_CUP_INITIAL_RANKINGS.length
+            ? FIRDAUS_CUP_INITIAL_RANKINGS
+            : t.initialRankings,
+        standings:
+          safeStandings.length === 0 ? FIRDAUS_CUP_STANDINGS : safeStandings,
+        pairings:
+          safePairings.length === 0 ||
+          safePairings.some(
+            (p, i) =>
+              safePairings.findIndex(
+                (q, j) =>
+                  j !== i &&
+                  q.round === p.round &&
+                  (q.board === p.board ||
+                    normalizeAthleteName(q.whiteName) ===
+                      normalizeAthleteName(p.whiteName) ||
+                    normalizeAthleteName(q.blackName) ===
+                      normalizeAthleteName(p.blackName))
+              ) >= 0
+          )
+            ? FIRDAUS_CUP_CANONICAL_PAIRINGS
+            : safePairings,
+      };
+    });
+
+  const hasDarwinCup = migratedTournaments.some(
+    (t) => t.id === 'trn-darwin-cup-2026' || /\bdarwin\s*cup/i.test(t.name)
+  );
+  const darwinSeed = SEED_TOURNAMENTS.find(
+    (t) => t.id === 'trn-darwin-cup-2026'
+  );
+  if (!hasDarwinCup && darwinSeed) {
+    migratedTournaments.push(darwinSeed);
+  }
+
   return {
     ...data,
     athletes: [...cleanedAthletes, ...missingSeedAthletes],
-    tournaments: safeTournaments
-      .filter((t) => !REMOVED_TOURNAMENT_IDS.has(t.id))
-      .map((t) => {
-        const safeStandings = Array.isArray(t.standings) ? t.standings : [];
-        const safePairings = Array.isArray(t.pairings) ? t.pairings : [];
-        if (t.id !== 'trn-kejurkot-2026') {
-          return {
-            ...t,
-            standings: safeStandings,
-            pairings: safePairings,
-          };
-        }
-        const isLegacyNameOrTc =
-          t.name === 'Kejurkot Catur Kota Batam 2026' ||
-          t.timeControlCategory === 'Standard';
-        const isLegacyVenueOrDate =
-          t.venue === 'Atrium Utama DC Mall Batam' ||
-          t.startDate === '14 Nov 2026';
-        return {
-          ...t,
-          name: isLegacyNameOrTc ? 'Firdaus Cup 2026' : t.name,
-          startDate: isLegacyVenueOrDate ? '5 Juli 2026' : t.startDate,
-          endDate: isLegacyVenueOrDate ? '5 Juli 2026' : t.endDate,
-          venue: isLegacyVenueOrDate
-            ? 'Kampung Tua Belian, Batam Center, Kota Batam'
-            : t.venue,
-          chiefArbiter:
-            t.chiefArbiter === 'WN Agus Kurniawan, FA' && isLegacyVenueOrDate
-              ? 'Aldriyanto Syarif, PNP, WNM'
-              : t.chiefArbiter,
-          timeControlCategory: isLegacyNameOrTc ? 'Catur Cepat' : t.timeControlCategory,
-          timeControlDetail: isLegacyNameOrTc
-            ? '10 menit + 3 detik'
-            : t.timeControlDetail,
-          description: isLegacyNameOrTc ? '' : t.description,
-          initialRankings:
-            !Array.isArray(t.initialRankings) ||
-            t.initialRankings.length < FIRDAUS_CUP_INITIAL_RANKINGS.length
-              ? FIRDAUS_CUP_INITIAL_RANKINGS
-              : t.initialRankings,
-          standings:
-            safeStandings.length === 0 ? FIRDAUS_CUP_STANDINGS : safeStandings,
-          pairings:
-            safePairings.length === 0 ||
-            safePairings.some(
-              (p, i) =>
-                safePairings.findIndex(
-                  (q, j) =>
-                    j !== i &&
-                    q.round === p.round &&
-                    (q.board === p.board ||
-                      normalizeAthleteName(q.whiteName) ===
-                        normalizeAthleteName(p.whiteName) ||
-                      normalizeAthleteName(q.blackName) ===
-                        normalizeAthleteName(p.blackName))
-                ) >= 0
-            )
-              ? FIRDAUS_CUP_CANONICAL_PAIRINGS
-              : safePairings,
-        };
-      }),
+    tournaments: migratedTournaments,
     news: safeNews.filter((n) => !REMOVED_NEWS_IDS.has(n.id)),
   };
 }

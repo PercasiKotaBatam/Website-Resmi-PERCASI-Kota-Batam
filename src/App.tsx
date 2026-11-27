@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import type { User } from 'firebase/auth';
+import { useEffect, useRef, useState } from 'react';
 import { AboutView } from './components/AboutView';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminToolbar, type ProjectSyncStatus } from './components/AdminToolbar';
@@ -24,6 +25,14 @@ import type {
   Tournament,
 } from './types/chess';
 import {
+  bootstrapCloudIfEmpty,
+  checkIsFirebaseAdmin,
+  publishPortalDataToCloud,
+  signOutFirebaseAdmin,
+  subscribeCloudPortalData,
+  subscribeFirebaseAuthState,
+} from './utils/firebase';
+import {
   pickAuthoritativePortalData,
   syncAthletesFromTournaments,
 } from './utils/portalLogic';
@@ -38,6 +47,8 @@ import {
   syncPortalDataToServer,
 } from './utils/storage';
 
+const ADMIN_SESSION_TOKEN_KEY = 'percasi_batam_admin_session_token_v1';
+
 const SECTION_LABELS: Record<NavSection, string> = {
   beranda: 'Beranda',
   berita: 'Berita',
@@ -50,11 +61,23 @@ const SECTION_LABELS: Record<NavSection, string> = {
 export default function App() {
   const [portalData, setPortalData] = useState<PortalData>(() => loadPortalData());
   const [activeSection, setActiveSection] = useState<NavSection>('beranda');
-  const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    try {
+      return window.sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [firebaseAdminUser, setFirebaseAdminUser] = useState<User | null>(null);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<ProjectSyncStatus>('idle');
 
-  const isAdminMode = Boolean(adminToken);
+  const cloudSnapshotRef = useRef<PortalData | null>(null);
+  const portalDataRef = useRef<PortalData>(portalData);
+  portalDataRef.current = portalData;
+
+  const isCloudAdmin = Boolean(firebaseAdminUser);
+  const isAdminMode = Boolean(adminToken || firebaseAdminUser);
 
   const [selectedAthleteTarget, setSelectedAthleteTarget] = useState<string | null>(null);
   const [athleteNavStack, setAthleteNavStack] = useState<string[]>([]);
@@ -69,10 +92,40 @@ export default function App() {
   const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
   const [backupOpen, setBackupOpen] = useState(false);
 
+  // Restore server/local session token if present on refresh
+  useEffect(() => {
+    const savedToken = adminToken;
+    if (!savedToken || isStaticAdminToken(savedToken) || savedToken.startsWith('firebase:')) {
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/admin/session', {
+      headers: { Authorization: `Bearer ${savedToken}` },
+      cache: 'no-store',
+    })
+      .then((res) => {
+        if (!cancelled && res.status === 401) {
+          setAdminToken(null);
+          try {
+            window.sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+          } catch {
+            // ignore
+          }
+        }
+      })
+      .catch(() => {
+        // ignore network errors on static hosts
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load published static/server JSON fallback (never overwrites newer cloud or local-edited snapshots)
   useEffect(() => {
     let cancelled = false;
     void fetchPublishedPortalData().then((publishedData) => {
-      if (cancelled || !publishedData) return;
+      if (cancelled || !publishedData || cloudSnapshotRef.current) return;
       const { data: localData, localEdited } = readLocalPortalSnapshot();
       const authoritative = pickAuthoritativePortalData({
         seedData: SEED_PORTAL_DATA,
@@ -88,6 +141,95 @@ export default function App() {
     };
   }, []);
 
+  // Subscribe to shared Cloud Firestore state (keeps AI Studio and GitHub Pages identical)
+  useEffect(() => {
+    const unsubscribe = subscribeCloudPortalData(
+      (cloudRaw) => {
+        const migratedCloud = migratePortalData(cloudRaw);
+        cloudSnapshotRef.current = migratedCloud;
+
+        const { data: localData, localEdited } = readLocalPortalSnapshot();
+        const cloudMs = Date.parse(migratedCloud.updatedAt) || 0;
+        const localMs = localData ? Date.parse(localData.updatedAt) || 0 : 0;
+
+        if (localEdited && localData && localMs > cloudMs) {
+          // Local edit is strictly newer and awaiting cloud push
+          return;
+        }
+
+        savePortalData(migratedCloud, false);
+        setPortalData(migratedCloud);
+        setSelectedTournament((prev) =>
+          prev
+            ? migratedCloud.tournaments.find((t) => t.id === prev.id) ?? prev
+            : null
+        );
+      },
+      () => {
+        // Keep cached/seed data active if offline or unreachable
+      }
+    );
+    return unsubscribe;
+  }, []);
+
+  // Observe Firebase Google Admin auth state across page refreshes
+  useEffect(() => {
+    const unsubscribe = subscribeFirebaseAuthState((user) => {
+      if (!user) {
+        setFirebaseAdminUser(null);
+        return;
+      }
+      void checkIsFirebaseAdmin(user)
+        .then((allowed) => {
+          if (!allowed) {
+            setFirebaseAdminUser(null);
+            return;
+          }
+          setFirebaseAdminUser(user);
+          setSyncStatus('cloud-syncing');
+          const currentLocal = portalDataRef.current;
+          const { data: localSnapshot, localEdited } = readLocalPortalSnapshot();
+
+          void bootstrapCloudIfEmpty(currentLocal, user)
+            .then(async ({ seeded, cloudData }) => {
+              if (seeded) {
+                cloudSnapshotRef.current = currentLocal;
+                savePortalData(currentLocal, false);
+                setSyncStatus('cloud-synced');
+                return;
+              }
+              if (cloudData) {
+                const migratedCloud = migratePortalData(cloudData);
+                cloudSnapshotRef.current = migratedCloud;
+                const cloudMs = Date.parse(migratedCloud.updatedAt) || 0;
+                const localMs = localSnapshot
+                  ? Date.parse(localSnapshot.updatedAt) || 0
+                  : 0;
+
+                if (localEdited && localSnapshot && localMs > cloudMs) {
+                  const localMigrated = migratePortalData(localSnapshot);
+                  await publishPortalDataToCloud(localMigrated, migratedCloud, user);
+                  cloudSnapshotRef.current = localMigrated;
+                  savePortalData(localMigrated, false);
+                  setPortalData(localMigrated);
+                } else {
+                  savePortalData(migratedCloud, false);
+                  setPortalData(migratedCloud);
+                }
+              }
+              setSyncStatus('cloud-synced');
+            })
+            .catch(() => {
+              setSyncStatus('cloud-error');
+            });
+        })
+        .catch(() => {
+          setFirebaseAdminUser(null);
+        });
+    });
+    return unsubscribe;
+  }, []);
+
   const commitPortalChange = (
     nextData: PortalData,
     options: { markLocalEdited?: boolean; tokenOverride?: string | null } = {}
@@ -95,8 +237,23 @@ export default function App() {
     const { markLocalEdited = true, tokenOverride } = options;
     const saved = savePortalData(nextData, markLocalEdited);
     setPortalData(saved);
+
+    if (firebaseAdminUser) {
+      setSyncStatus('cloud-syncing');
+      void publishPortalDataToCloud(saved, cloudSnapshotRef.current, firebaseAdminUser)
+        .then(() => {
+          cloudSnapshotRef.current = saved;
+          savePortalData(saved, false);
+          setSyncStatus('cloud-synced');
+        })
+        .catch(() => {
+          setSyncStatus('cloud-error');
+        });
+      return;
+    }
+
     const activeToken = tokenOverride !== undefined ? tokenOverride : adminToken;
-    if (activeToken && !isStaticAdminToken(activeToken)) {
+    if (activeToken && !isStaticAdminToken(activeToken) && !activeToken.startsWith('firebase:')) {
       setSyncStatus('syncing');
       void syncPortalDataToServer(saved, activeToken).then((res) => {
         setSyncStatus(res.ok ? 'synced' : 'local-only');
@@ -183,12 +340,19 @@ export default function App() {
   const handleLogoutAdmin = () => {
     const token = adminToken;
     setAdminToken(null);
+    setFirebaseAdminUser(null);
     setSyncStatus('idle');
     setMemberFormOpen(false);
     setUploadTournamentOpen(false);
     setEditingTournament(null);
     setBackupOpen(false);
-    if (token && !isStaticAdminToken(token)) {
+    try {
+      window.sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+    } catch {
+      // ignore
+    }
+    void signOutFirebaseAdmin();
+    if (token && !isStaticAdminToken(token) && !token.startsWith('firebase:')) {
       void fetch('/api/admin/logout', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -206,8 +370,28 @@ export default function App() {
     }
   };
 
-  const handleAdminAuthSuccess = (token: string) => {
+  const handleAdminAuthSuccess = (
+    token: string,
+    _username: string,
+    firebaseUser?: User
+  ) => {
+    if (firebaseUser) {
+      setFirebaseAdminUser(firebaseUser);
+      setAdminToken(null);
+      try {
+        window.sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     setAdminToken(token);
+    try {
+      window.sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, token);
+    } catch {
+      // ignore
+    }
     if (isStaticAdminToken(token)) {
       setSyncStatus('local-only');
       return;
@@ -270,7 +454,17 @@ export default function App() {
   const handleResetSeed = () => {
     const fresh = resetPortalData();
     setPortalData(fresh);
-    if (adminToken && !isStaticAdminToken(adminToken)) {
+    if (firebaseAdminUser) {
+      setSyncStatus('cloud-syncing');
+      void publishPortalDataToCloud(fresh, cloudSnapshotRef.current, firebaseAdminUser)
+        .then(() => {
+          cloudSnapshotRef.current = fresh;
+          setSyncStatus('cloud-synced');
+        })
+        .catch(() => {
+          setSyncStatus('cloud-error');
+        });
+    } else if (adminToken && !isStaticAdminToken(adminToken)) {
       setSyncStatus('syncing');
       void syncPortalDataToServer(fresh, adminToken).then((res) => {
         setSyncStatus(res.ok ? 'synced' : 'local-only');
@@ -304,6 +498,8 @@ export default function App() {
       {isAdminMode && (
         <AdminToolbar
           syncStatus={syncStatus}
+          isCloudAdmin={isCloudAdmin}
+          onConnectCloudAdmin={() => setAdminLoginOpen(true)}
           onAddMember={handleOpenAddMember}
           onUploadTournament={handleOpenCreateTournament}
           onOpenBackup={() => setBackupOpen(true)}

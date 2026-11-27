@@ -1,0 +1,311 @@
+{
+  "entities": {
+    "PortalMeta": {
+      "title": "PortalMeta",
+      "description": "Metadata sinkronisasi global portal PERCASI Kota Batam antara AI Studio dan GitHub Pages.",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "description": "Versi skema portal"
+        },
+        "updatedAt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Timestamp ISO terakhir kali data portal diperbarui"
+        },
+        "updatedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "UID admin yang terakhir memperbarui data"
+        },
+        "updatedByEmail": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200,
+          "description": "Email admin yang terakhir memperbarui data"
+        },
+        "athletesCount": {
+          "type": "number",
+          "description": "Jumlah total atlet terdaftar"
+        },
+        "tournamentsCount": {
+          "type": "number",
+          "description": "Jumlah total turnamen terdaftar"
+        }
+      },
+      "required": ["version", "updatedAt", "updatedByUid", "athletesCount", "tournamentsCount"]
+    },
+    "Athlete": {
+      "title": "Athlete",
+      "description": "Profil resmi atlet catur PERCASI Kota Batam & Kepulauan Riau.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "title": {
+          "type": "string",
+          "enum": ["GM", "IM", "FM", "WFM", "NM", "MP", "AGM", "AIM", "AFM", "ACM", "Non-Gelar"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Senior Putra", "Senior Putri", "Junior U-18", "Junior U-14", "Veteran"]
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["Putra", "Putri"]
+        },
+        "birthDate": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "birthYear": {
+          "type": "number"
+        },
+        "club": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "city": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "district": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "ratings": {
+          "type": "object",
+          "description": "Rating Standard, Rapid, dan Blitz atlet"
+        },
+        "bio": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "federationStatus": {
+          "type": "string",
+          "enum": ["Atlet", "Aktif", "Pembinaan Daerah"]
+        },
+        "tournamentHistory": {
+          "type": "array",
+          "description": "Riwayat turnamen federasi atlet (maksimal 100 entri)"
+        }
+      },
+      "required": ["id", "fullName", "title", "category", "gender", "club", "district", "ratings", "bio", "federationStatus", "tournamentHistory"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Agenda turnamen resmi beserta peringkat awal, klasemen akhir, dan pairing per babak.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Akan Datang", "Sedang Berlangsung", "Selesai"]
+        },
+        "startDate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "endDate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "venue": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "timeControlCategory": {
+          "type": "string",
+          "enum": ["Standard", "Catur Cepat", "Rapid", "Blitz"]
+        },
+        "timeControlDetail": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "rounds": {
+          "type": "number"
+        },
+        "chiefArbiter": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "organizer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "participantsCount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "initialRankings": {
+          "type": "array",
+          "description": "Daftar peringkat awal pemain (maksimal 1000 peserta)"
+        },
+        "standings": {
+          "type": "array",
+          "description": "Klasemen akhir turnamen (maksimal 1000 peserta)"
+        },
+        "pairings": {
+          "type": "array",
+          "description": "Pairing dan hasil babak per babak (maksimal 5000 partai)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status",
+        "startDate",
+        "endDate",
+        "venue",
+        "timeControlCategory",
+        "timeControlDetail",
+        "rounds",
+        "chiefArbiter",
+        "organizer",
+        "participantsCount",
+        "description",
+        "standings",
+        "pairings"
+      ]
+    },
+    "NewsArticle": {
+      "title": "NewsArticle",
+      "description": "Artikel berita dan pengumuman resmi Pengkot PERCASI Kota Batam.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Turnamen", "Pembinaan", "Pengumuman Resmi"]
+        },
+        "publishedAt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "excerpt": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "content": {
+          "type": "array"
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "featured": {
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "title", "category", "publishedAt", "author", "excerpt", "content", "imageUrl"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Daftar UID admin resmi yang diotorisasi mengelola data portal.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "addedAt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "addedBy": {
+          "type": "string",
+          "maxLength": 128
+        }
+      },
+      "required": ["uid", "email", "addedAt", "addedBy"]
+    }
+  },
+  "firestore": {
+    "/portalMeta/{metaId}": {
+      "schema": "PortalMeta",
+      "description": "Metadata sinkronisasi global portal PERCASI Kota Batam"
+    },
+    "/athletes/{athleteId}": {
+      "schema": "Athlete",
+      "description": "Koleksi resmi atlet catur Pengkot PERCASI Kota Batam & Kepri"
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": "Tournament",
+      "description": "Koleksi turnamen resmi beserta peringkat awal, klasemen, dan pairing babak"
+    },
+    "/news/{newsId}": {
+      "schema": "NewsArticle",
+      "description": "Koleksi berita dan pengumuman resmi"
+    },
+    "/admins/{adminUid}": {
+      "schema": "AdminUser",
+      "description": "Koleksi pengguna admin terotorisasi"
+    }
+  }
+}

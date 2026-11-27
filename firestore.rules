@@ -1,0 +1,223 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable hardened primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'percasikotabatam01@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Blueprints
+    function isValidPortalMeta(data, metaId) {
+      return isValidId(metaId)
+        && data.keys().hasAll(['version', 'updatedAt', 'updatedByUid', 'athletesCount', 'tournamentsCount'])
+        && data.keys().hasOnly(['version', 'updatedAt', 'updatedByUid', 'updatedByEmail', 'athletesCount', 'tournamentsCount'])
+        && data.version is string && data.version.size() >= 1 && data.version.size() <= 20
+        && data.updatedAt is string && data.updatedAt.size() >= 1 && data.updatedAt.size() <= 64
+        && data.updatedByUid is string && data.updatedByUid == request.auth.uid && data.updatedByUid.size() <= 128
+        && (!('updatedByEmail' in data) || (data.updatedByEmail is string && data.updatedByEmail.size() >= 3 && data.updatedByEmail.size() <= 200))
+        && data.athletesCount is number && data.athletesCount >= 0 && data.athletesCount <= 10000
+        && data.tournamentsCount is number && data.tournamentsCount >= 0 && data.tournamentsCount <= 2000;
+    }
+
+    function isValidRatingsMap(ratings) {
+      return ratings is map
+        && ratings.keys().hasAll(['standard', 'rapid', 'blitz'])
+        && ratings.keys().hasOnly(['standard', 'rapid', 'blitz'])
+        && ratings.standard is number && ratings.standard >= 0 && ratings.standard <= 4000
+        && ratings.rapid is number && ratings.rapid >= 0 && ratings.rapid <= 4000
+        && ratings.blitz is number && ratings.blitz >= 0 && ratings.blitz <= 4000;
+    }
+
+    function isValidAthlete(data, athleteId) {
+      return isValidId(athleteId)
+        && data.keys().hasAll([
+          'id', 'fullName', 'title', 'category', 'gender',
+          'club', 'district', 'ratings', 'bio', 'federationStatus', 'tournamentHistory'
+        ])
+        && data.keys().hasOnly([
+          'id', 'fullName', 'title', 'category', 'gender',
+          'birthDate', 'birthYear', 'club', 'city', 'district',
+          'photoUrl', 'ratings', 'bio', 'federationStatus', 'tournamentHistory'
+        ])
+        && data.id is string && data.id == athleteId && isValidId(data.id)
+        && data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 160
+        && data.title in ['GM', 'IM', 'FM', 'WFM', 'NM', 'MP', 'AGM', 'AIM', 'AFM', 'ACM', 'Non-Gelar']
+        && data.category in ['Senior Putra', 'Senior Putri', 'Junior U-18', 'Junior U-14', 'Veteran']
+        && data.gender in ['Putra', 'Putri']
+        && (!('birthDate' in data) || (data.birthDate is string && data.birthDate.size() <= 32))
+        && (!('birthYear' in data) || (data.birthYear is number && data.birthYear >= 1900 && data.birthYear <= 2030))
+        && data.club is string && data.club.size() >= 1 && data.club.size() <= 160
+        && (!('city' in data) || (data.city is string && data.city.size() >= 1 && data.city.size() <= 64))
+        && data.district is string && data.district.size() >= 1 && data.district.size() <= 64
+        && (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 350000))
+        && isValidRatingsMap(data.ratings)
+        && data.bio is string && data.bio.size() <= 2000
+        && data.federationStatus in ['Atlet', 'Aktif', 'Pembinaan Daerah']
+        && data.tournamentHistory is list && data.tournamentHistory.size() <= 100
+        && (data.tournamentHistory.size() == 0 || data.tournamentHistory[0] is map);
+    }
+
+    function isValidTournament(data, tournamentId) {
+      return isValidId(tournamentId)
+        && data.keys().hasAll([
+          'id', 'name', 'status', 'startDate', 'endDate', 'venue',
+          'timeControlCategory', 'timeControlDetail', 'rounds',
+          'chiefArbiter', 'organizer', 'participantsCount', 'description',
+          'standings', 'pairings'
+        ])
+        && data.keys().hasOnly([
+          'id', 'name', 'status', 'startDate', 'endDate', 'venue',
+          'timeControlCategory', 'timeControlDetail', 'rounds',
+          'chiefArbiter', 'organizer', 'participantsCount', 'description',
+          'initialRankings', 'standings', 'pairings'
+        ])
+        && data.id is string && data.id == tournamentId && isValidId(data.id)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 200
+        && data.status in ['Akan Datang', 'Sedang Berlangsung', 'Selesai']
+        && data.startDate is string && data.startDate.size() >= 1 && data.startDate.size() <= 64
+        && data.endDate is string && data.endDate.size() >= 1 && data.endDate.size() <= 64
+        && data.venue is string && data.venue.size() >= 1 && data.venue.size() <= 240
+        && data.timeControlCategory in ['Standard', 'Catur Cepat', 'Rapid', 'Blitz']
+        && data.timeControlDetail is string && data.timeControlDetail.size() >= 1 && data.timeControlDetail.size() <= 120
+        && data.rounds is number && data.rounds >= 1 && data.rounds <= 30
+        && data.chiefArbiter is string && data.chiefArbiter.size() >= 1 && data.chiefArbiter.size() <= 160
+        && data.organizer is string && data.organizer.size() >= 1 && data.organizer.size() <= 160
+        && data.participantsCount is number && data.participantsCount >= 0 && data.participantsCount <= 2000
+        && data.description is string && data.description.size() <= 4000
+        && (!('initialRankings' in data) || (data.initialRankings is list && data.initialRankings.size() <= 1000 && (data.initialRankings.size() == 0 || data.initialRankings[0] is map)))
+        && data.standings is list && data.standings.size() <= 1000 && (data.standings.size() == 0 || data.standings[0] is map)
+        && data.pairings is list && data.pairings.size() <= 5000 && (data.pairings.size() == 0 || data.pairings[0] is map);
+    }
+
+    function isValidNewsArticle(data, newsId) {
+      return isValidId(newsId)
+        && data.keys().hasAll(['id', 'title', 'category', 'publishedAt', 'author', 'excerpt', 'content', 'imageUrl'])
+        && data.keys().hasOnly(['id', 'title', 'category', 'publishedAt', 'author', 'excerpt', 'content', 'imageUrl', 'featured'])
+        && data.id is string && data.id == newsId && isValidId(data.id)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 240
+        && data.category in ['Turnamen', 'Pembinaan', 'Pengumuman Resmi']
+        && data.publishedAt is string && data.publishedAt.size() >= 1 && data.publishedAt.size() <= 64
+        && data.author is string && data.author.size() >= 1 && data.author.size() <= 160
+        && data.excerpt is string && data.excerpt.size() <= 600
+        && data.content is list && data.content.size() <= 100 && (data.content.size() == 0 || data.content[0] is string)
+        && data.imageUrl is string && data.imageUrl.size() <= 350000
+        && (!('featured' in data) || data.featured is bool);
+    }
+
+    function isValidAdminUser(data, adminUid) {
+      return isValidId(adminUid)
+        && data.keys().hasAll(['uid', 'email', 'addedAt', 'addedBy'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'addedAt', 'addedBy'])
+        && data.uid is string && data.uid == adminUid && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 160))
+        && data.addedAt is string && data.addedAt.size() >= 1 && data.addedAt.size() <= 64
+        && data.addedBy is string && data.addedBy == request.auth.uid && data.addedBy.size() <= 128;
+    }
+
+    // Connection health-check doc
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Global portal sync metadata
+    match /portalMeta/{metaId} {
+      allow get: if isValidId(metaId);
+      allow list: if resource.data.version is string;
+      allow create: if isAdmin() && isValidPortalMeta(incoming(), metaId);
+      allow update: if isAdmin()
+        && isValidPortalMeta(incoming(), metaId)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['version', 'updatedAt', 'updatedByUid', 'updatedByEmail', 'athletesCount', 'tournamentsCount']);
+      allow delete: if isAdmin() && isValidId(metaId);
+    }
+
+    // Public sports athlete directory (writable only by verified admin)
+    match /athletes/{athleteId} {
+      allow get: if isValidId(athleteId);
+      allow list: if resource.data.id is string;
+      allow create: if isAdmin() && isValidAthlete(incoming(), athleteId);
+      allow update: if isAdmin()
+        && isValidAthlete(incoming(), athleteId)
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'fullName', 'title', 'category', 'gender',
+          'birthDate', 'birthYear', 'club', 'city', 'district',
+          'photoUrl', 'ratings', 'bio', 'federationStatus', 'tournamentHistory'
+        ]);
+      allow delete: if isAdmin() && isValidId(athleteId);
+    }
+
+    // Public tournament standings, initial rankings, and round pairings (writable only by verified admin)
+    match /tournaments/{tournamentId} {
+      allow get: if isValidId(tournamentId);
+      allow list: if resource.data.id is string;
+      allow create: if isAdmin() && isValidTournament(incoming(), tournamentId);
+      allow update: if isAdmin()
+        && isValidTournament(incoming(), tournamentId)
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'status', 'startDate', 'endDate', 'venue',
+          'timeControlCategory', 'timeControlDetail', 'rounds',
+          'chiefArbiter', 'organizer', 'participantsCount', 'description',
+          'initialRankings', 'standings', 'pairings'
+        ]);
+      allow delete: if isAdmin() && isValidId(tournamentId);
+    }
+
+    // Public news articles (writable only by verified admin)
+    match /news/{newsId} {
+      allow get: if isValidId(newsId);
+      allow list: if resource.data.id is string;
+      allow create: if isAdmin() && isValidNewsArticle(incoming(), newsId);
+      allow update: if isAdmin()
+        && isValidNewsArticle(incoming(), newsId)
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'category', 'publishedAt', 'author',
+          'excerpt', 'content', 'imageUrl', 'featured'
+        ]);
+      allow delete: if isAdmin() && isValidId(newsId);
+    }
+
+    // Restricted admin registry (PII isolation: admins only)
+    match /admins/{adminUid} {
+      allow get: if isAdmin() && isValidId(adminUid);
+      allow list: if isAdmin() && resource.data.uid is string;
+      allow create: if isAdmin() && isValidAdminUser(incoming(), adminUid);
+      allow update: if isAdmin()
+        && isValidAdminUser(incoming(), adminUid)
+        && incoming().uid == existing().uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'addedAt', 'addedBy']);
+      allow delete: if isAdmin() && isValidId(adminUid);
+    }
+  }
+}

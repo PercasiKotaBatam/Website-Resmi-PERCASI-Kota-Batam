@@ -1,5 +1,7 @@
-import { Eye, EyeOff, KeyRound, RotateCcw, ShieldCheck, X } from 'lucide-react';
+import { Cloud, Eye, EyeOff, KeyRound, RotateCcw, ShieldCheck, X } from 'lucide-react';
+import type { User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
+import { BOOTSTRAPPED_ADMIN_EMAIL, signInWithGoogleAdmin } from '../utils/firebase';
 import {
   clearStaticAdmin,
   hasStaticAdminClaimed,
@@ -10,7 +12,7 @@ import {
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (token: string, username: string) => void;
+  onSuccess: (token: string, username: string, firebaseUser?: User) => void;
 }
 
 interface AdminStatusResponse {
@@ -33,6 +35,7 @@ export function AdminLoginModal({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -42,6 +45,7 @@ export function AdminLoginModal({
     setPassword('');
     setConfirmPassword('');
     setShowPassword(false);
+    setGoogleSubmitting(false);
     setStatusLoading(true);
 
     fetch('/api/admin/status', { cache: 'no-store' })
@@ -91,6 +95,26 @@ export function AdminLoginModal({
     setPassword('');
     setConfirmPassword('');
     setError('');
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleSubmitting(true);
+    try {
+      const result = await signInWithGoogleAdmin();
+      if (result.ok === false) {
+        setError(result.error);
+        return;
+      }
+      onSuccess(
+        `firebase:${result.user.uid}`,
+        result.user.email || BOOTSTRAPPED_ADMIN_EMAIL,
+        result.user
+      );
+      onClose();
+    } finally {
+      setGoogleSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,7 +200,7 @@ export function AdminLoginModal({
         aria-modal="true"
         aria-labelledby="admin-login-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-2.5">
@@ -192,18 +216,10 @@ export function AdminLoginModal({
                 id="admin-login-title"
                 className="text-base font-extrabold text-[#0F2342]"
               >
-                {isStatic
-                  ? configured
-                    ? 'Masuk Mode Admin Lokal'
-                    : 'Aktivasi Mode Admin Lokal'
-                  : configured
-                    ? 'Masuk Mode Admin'
-                    : 'Aktivasi Akun Admin'}
+                Masuk Mode Admin
               </h2>
               <p className="text-[11px] text-slate-500">
-                {isStatic
-                  ? 'Mode Pengelolaan Peramban (Hosting Statis)'
-                  : 'Otorisasi Pengurus PERCASI Kota Batam'}
+                Otorisasi Pengurus PERCASI Kota Batam
               </p>
             </div>
           </div>
@@ -222,19 +238,55 @@ export function AdminLoginModal({
             Memeriksa status keamanan admin...
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 p-6">
-            {isStatic && !configured && (
-              <div className="rounded-md border border-sky-200 bg-sky-50 px-3.5 py-3 text-xs leading-relaxed text-sky-950">
-                <p className="font-bold">Mode Admin Lokal (GitHub Pages)</p>
-                <p className="mt-1">
-                  Situs statis tidak menjalankan server backend, sehingga akun admin
-                  disimpan terenkripsi lokal di peramban ini. Perubahan data dapat
-                  diekspor lewat tombol <strong>Backup &amp; Restore Data</strong>{' '}
-                  lalu diperbarui ke berkas{' '}
-                  <code className="font-mono">public/data/portal-data.json</code>.
-                </p>
+          <div className="space-y-4 p-6">
+            {/* Primary Cloud Sync Login (Google Admin) */}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4">
+              <div className="flex items-start gap-2.5">
+                <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-extrabold text-emerald-950">
+                    Sinkronisasi Cloud (AI Studio &amp; GitHub Pages)
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-emerald-900">
+                    Masuk dengan akun Google Admin{' '}
+                    <span className="font-mono font-semibold">{BOOTSTRAPPED_ADMIN_EMAIL}</span>{' '}
+                    agar semua edit keanggotaan, turnamen, dan pairing tersimpan permanen di cloud dan langsung sama di AI Studio maupun GitHub.
+                  </p>
+                </div>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleSubmitting || submitting}
+                className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#0F2342] px-4 text-xs font-bold text-white transition-colors hover:bg-[#173360] disabled:opacity-60"
+              >
+                <Cloud className="h-4 w-4" aria-hidden="true" />
+                <span>
+                  {googleSubmitting
+                    ? 'Menghubungkan akun Google...'
+                    : 'Masuk dengan Google Admin'}
+                </span>
+              </button>
+            </div>
+
+            <div className="relative flex items-center py-1">
+              <div className="grow border-t border-slate-200" />
+              <span className="mx-3 shrink-0 text-[11px] font-semibold text-slate-400">
+                atau login {isStatic ? 'lokal' : 'server'}
+              </span>
+              <div className="grow border-t border-slate-200" />
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {isStatic && !configured && (
+                <div className="rounded-md border border-sky-200 bg-sky-50 px-3.5 py-3 text-xs leading-relaxed text-sky-950">
+                  <p className="font-bold">Mode Admin Lokal</p>
+                  <p className="mt-1">
+                    Menyimpan akun admin lokal di peramban ini. Gunakan{' '}
+                    <strong>Masuk dengan Google Admin</strong> di atas jika ingin perubahan tersinkron otomatis ke semua perangkat dan situs.
+                  </p>
+                </div>
+              )}
 
             {!isStatic && !configured && (
               <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-950">
@@ -361,7 +413,7 @@ export function AdminLoginModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || googleSubmitting}
                   className="inline-flex h-10 items-center rounded-md bg-[#0F2342] px-5 text-xs font-bold text-white hover:bg-[#173360] disabled:opacity-60"
                 >
                   {submitting
@@ -373,6 +425,7 @@ export function AdminLoginModal({
               </div>
             </div>
           </form>
+          </div>
         )}
       </div>
     </div>

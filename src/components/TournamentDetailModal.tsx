@@ -2,11 +2,13 @@ import {
   ArrowUpDown,
   Calendar,
   Check,
+  Download,
   MapPin,
   Pencil,
   Plus,
   Search,
   Trash2,
+  Upload,
   UserCheck,
   X,
 } from 'lucide-react';
@@ -16,11 +18,16 @@ import {
   buildInitialRankings,
   filterPairingsByRound,
   formatRatingDelta,
+  generateSamplePairingsExcelBytes,
   getPlayerDisplayParts,
+  mergeRoundPairings,
+  parsePairingsCsv,
+  parsePairingsExcelBuffer,
   resolvePlayerMasterTitle,
   sortInitialRankings,
   stripTitleSuffix,
 } from '../utils/portalLogic';
+import { downloadBinaryFile } from '../utils/storage';
 import { TitleBadge, TournamentStatusText } from './TitleBadge';
 
 interface TournamentDetailModalProps {
@@ -139,6 +146,11 @@ export function TournamentDetailModal({
   const [draftInitialRows, setDraftInitialRows] = useState<EditableInitialRankRow[]>([]);
   const [initialEditQuery, setInitialEditQuery] = useState('');
   const [initialEditError, setInitialEditError] = useState('');
+  const [uploadTargetRound, setUploadTargetRound] = useState<number | 'auto'>(1);
+  const [pairingUploadFeedback, setPairingUploadFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     if (
@@ -152,19 +164,24 @@ export function TournamentDetailModal({
     }
     if (tournament && tournament.pairings.length > 0) {
       const firstRound = Math.min(...tournament.pairings.map((p) => p.round));
+      const maxRound = Math.max(...tournament.pairings.map((p) => p.round));
       setSelectedRound(firstRound);
+      setUploadTargetRound(maxRound + 1);
     } else {
       setSelectedRound('all');
+      setUploadTargetRound(1);
     }
     setEditingInitialRank(false);
     setInitialEditQuery('');
     setInitialEditError('');
+    setPairingUploadFeedback(null);
   }, [tournament?.id]);
 
   useEffect(() => {
     if (!isAdminMode) {
       setEditingInitialRank(false);
       setInitialEditError('');
+      setPairingUploadFeedback(null);
     }
   }, [isAdminMode]);
 
@@ -293,7 +310,7 @@ export function TournamentDetailModal({
               role="tab"
               aria-selected={activeTab === 'standings'}
               onClick={() => setActiveTab('standings')}
-              className={`h-9 rounded px-4 text-xs font-bold transition-colors ${
+              className={`h-9 rounded px-4 text-xs font-bold ${
                 activeTab === 'standings'
                   ? 'bg-[#0F2342] text-white'
                   : 'text-slate-700 hover:text-[#0F2342]'
@@ -306,7 +323,7 @@ export function TournamentDetailModal({
               role="tab"
               aria-selected={activeTab === 'initialRank'}
               onClick={() => setActiveTab('initialRank')}
-              className={`h-9 rounded px-4 text-xs font-bold transition-colors ${
+              className={`h-9 rounded px-4 text-xs font-bold ${
                 activeTab === 'initialRank'
                   ? 'bg-[#0F2342] text-white'
                   : 'text-slate-700 hover:text-[#0F2342]'
@@ -319,7 +336,7 @@ export function TournamentDetailModal({
               role="tab"
               aria-selected={activeTab === 'pairings'}
               onClick={() => setActiveTab('pairings')}
-              className={`h-9 rounded px-4 text-xs font-bold transition-colors ${
+              className={`h-9 rounded px-4 text-xs font-bold ${
                 activeTab === 'pairings'
                   ? 'bg-[#0F2342] text-white'
                   : 'text-slate-700 hover:text-[#0F2342]'
@@ -1175,69 +1192,258 @@ export function TournamentDetailModal({
                 </div>
               );
             })()
-          ) : roundNumbers.length === 0 ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
-              Data pairing babak per babak belum tersedia untuk turnamen ini.
-            </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <label
-                    htmlFor="pairing-round-select"
-                    className="text-xs font-bold text-[#0F2342] whitespace-nowrap"
-                  >
-                    Pilih Babak
-                  </label>
-                  <select
-                    id="pairing-round-select"
-                    aria-label="Pilih babak pertandingan"
-                    value={effectiveRound === 'all' ? 'all' : String(effectiveRound)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedRound(val === 'all' ? 'all' : Number(val));
-                    }}
-                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-[#0F2342] focus:border-[#0F2342] focus:outline-none"
-                  >
-                    {roundNumbers.map((rnd) => (
-                      <option key={rnd} value={rnd}>
-                        Babak {rnd}
-                      </option>
-                    ))}
-                    <option value="all">
-                      Semua Babak ({roundNumbers.length} Babak)
-                    </option>
-                  </select>
-                </div>
-                <p className="font-mono-tabular text-xs font-medium text-slate-600">
-                  {effectiveRound === 'all'
-                    ? `Menampilkan seluruh ${roundNumbers.length} babak (${tournament.pairings.length} meja)`
-                    : `Babak ${effectiveRound} dari ${roundNumbers.length} · ${
-                        tournament.pairings.filter((p) => p.round === effectiveRound)
-                          .length
-                      } meja`}
-                </p>
-              </div>
+            (() => {
+              const roundSelectMax = Math.max(
+                tournament.rounds || 7,
+                roundNumbers[roundNumbers.length - 1] ?? 0,
+                12
+              );
+              const handleInlinePairingUpload = async (
+                e: React.ChangeEvent<HTMLInputElement>
+              ) => {
+                const file = e.target.files?.[0];
+                if (!file || !onUpdateTournament) return;
+                const lower = file.name.toLowerCase();
+                const targetRnd =
+                  uploadTargetRound === 'auto' ? undefined : uploadTargetRound;
 
-              {visibleRoundNumbers.map((rnd) => {
-                const matches = tournament.pairings.filter(
-                  (p) => p.round === rnd
+                try {
+                  const result =
+                    lower.endsWith('.xls') || lower.endsWith('.xlsx')
+                      ? parsePairingsExcelBuffer(await file.arrayBuffer(), targetRnd)
+                      : parsePairingsCsv(await file.text(), targetRnd);
+
+                  if (result.pairings.length === 0) {
+                    setPairingUploadFeedback({
+                      type: 'error',
+                      message:
+                        result.errors[0] ||
+                        'Tidak ada data pairing valid ditemukan dalam berkas tersebut.',
+                    });
+                    return;
+                  }
+
+                  const mergedPairings = mergeRoundPairings(
+                    tournament.pairings,
+                    result.pairings,
+                    targetRnd !== undefined ? [targetRnd] : result.detectedRounds
+                  );
+                  const maxRoundInMerged = Math.max(
+                    tournament.rounds || 1,
+                    ...mergedPairings.map((p) => p.round)
+                  );
+                  const updatedTournament: Tournament = {
+                    ...tournament,
+                    rounds: maxRoundInMerged,
+                    pairings: mergedPairings,
+                  };
+                  onUpdateTournament(updatedTournament);
+
+                  const firstUploadedRound = result.detectedRounds[0] ?? targetRnd ?? 1;
+                  setSelectedRound(firstUploadedRound);
+                  setUploadTargetRound(firstUploadedRound + 1);
+                  setPairingUploadFeedback({
+                    type: 'success',
+                    message: `Berhasil menyimpan ${result.pairings.length} meja untuk Babak ${result.detectedRounds.join(', ')} (${file.name}).`,
+                  });
+                } catch {
+                  setPairingUploadFeedback({
+                    type: 'error',
+                    message: 'Gagal membaca berkas Excel/CSV pairing babak.',
+                  });
+                } finally {
+                  e.target.value = '';
+                }
+              };
+
+              const handleInlineDownloadTemplate = () => {
+                const rnd =
+                  typeof uploadTargetRound === 'number' ? uploadTargetRound : 1;
+                downloadBinaryFile(
+                  `template-pairing-babak-${rnd}-percasi-batam.xlsx`,
+                  generateSamplePairingsExcelBytes(rnd),
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 );
-                const hasDetailedCols = matches.some(
-                  (m) =>
-                    m.whiteSeed !== undefined ||
-                    m.blackSeed !== undefined ||
-                    m.whitePoints !== undefined ||
-                    m.blackPoints !== undefined
+              };
+
+              const handleDeleteRound = (rndToDelete: number) => {
+                if (!onUpdateTournament) return;
+                const remaining = tournament.pairings.filter(
+                  (p) => p.round !== rndToDelete
                 );
-                return (
-                  <div
-                    key={rnd}
-                    className="overflow-hidden rounded-md border border-slate-200"
-                  >
-                    <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-[#0F2342]">
-                      Babak {rnd}
+                onUpdateTournament({
+                  ...tournament,
+                  pairings: remaining,
+                });
+                const remainingRounds = Array.from(
+                  new Set(remaining.map((p) => p.round))
+                ).sort((a, b) => a - b);
+                setSelectedRound(remainingRounds[0] ?? 'all');
+                setPairingUploadFeedback({
+                  type: 'success',
+                  message: `Pairing Babak ${rndToDelete} telah dihapus dan perubahan disimpan.`,
+                });
+              };
+
+              return (
+                <div className="space-y-4">
+                  {isAdminMode && onUpdateTournament && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50/70 p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-extrabold text-[#0F2342]">
+                            Upload Pairing &amp; Hasil Babak (Excel / CSV)
+                          </p>
+                          <p className="text-[11px] text-slate-600">
+                            Unggah berkas Excel (.xlsx/.xls) atau CSV dari Swiss-Manager untuk langsung menyimpan pairing dan hasil babak ini.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleInlineDownloadTemplate}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 whitespace-nowrap"
+                        >
+                          <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Unduh Template Excel</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <label
+                          htmlFor="inline-pairing-target-round"
+                          className="text-xs font-semibold text-slate-700 whitespace-nowrap"
+                        >
+                          Target Babak:
+                        </label>
+                        <select
+                          id="inline-pairing-target-round"
+                          value={
+                            uploadTargetRound === 'auto'
+                              ? 'auto'
+                              : String(uploadTargetRound)
+                          }
+                          onChange={(e) =>
+                            setUploadTargetRound(
+                              e.target.value === 'auto'
+                                ? 'auto'
+                                : Number(e.target.value)
+                            )
+                          }
+                          className="h-9 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-[#0F2342] focus:border-[#0F2342] focus:outline-none"
+                        >
+                          {Array.from({ length: roundSelectMax }, (_, i) => i + 1).map(
+                            (rnd) => (
+                              <option key={rnd} value={rnd}>
+                                Babak {rnd}
+                              </option>
+                            )
+                          )}
+                          <option value="auto">
+                            Deteksi Otomatis dari File Excel
+                          </option>
+                        </select>
+
+                        <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-[#0F2342] px-3.5 text-xs font-bold text-white hover:bg-[#173360] whitespace-nowrap">
+                          <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Pilih &amp; Simpan File Pairing/Hasil</span>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv,.txt"
+                            onChange={handleInlinePairingUpload}
+                            className="sr-only"
+                          />
+                        </label>
+                      </div>
+
+                      {pairingUploadFeedback && (
+                        <div
+                          role={pairingUploadFeedback.type === 'error' ? 'alert' : 'status'}
+                          className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                            pairingUploadFeedback.type === 'error'
+                              ? 'border-red-200 bg-red-50 text-[#B91C1C]'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                          }`}
+                        >
+                          {pairingUploadFeedback.message}
+                        </div>
+                      )}
                     </div>
+                  )}
+
+                  {roundNumbers.length === 0 ? (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                      Data pairing babak per babak belum tersedia untuk turnamen ini.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <label
+                            htmlFor="pairing-round-select"
+                            className="text-xs font-bold text-[#0F2342] whitespace-nowrap"
+                          >
+                            Pilih Babak
+                          </label>
+                          <select
+                            id="pairing-round-select"
+                            aria-label="Pilih babak pertandingan"
+                            value={effectiveRound === 'all' ? 'all' : String(effectiveRound)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedRound(val === 'all' ? 'all' : Number(val));
+                            }}
+                            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-[#0F2342] focus:border-[#0F2342] focus:outline-none"
+                          >
+                            {roundNumbers.map((rnd) => (
+                              <option key={rnd} value={rnd}>
+                                Babak {rnd}
+                              </option>
+                            ))}
+                            <option value="all">
+                              Semua Babak ({roundNumbers.length} Babak)
+                            </option>
+                          </select>
+                        </div>
+                        <p className="font-mono-tabular text-xs font-medium text-slate-600">
+                          {effectiveRound === 'all'
+                            ? `Menampilkan seluruh ${roundNumbers.length} babak (${tournament.pairings.length} meja)`
+                            : `Babak ${effectiveRound} dari ${roundNumbers.length} · ${
+                                tournament.pairings.filter((p) => p.round === effectiveRound)
+                                  .length
+                              } meja`}
+                        </p>
+                      </div>
+
+                      {visibleRoundNumbers.map((rnd) => {
+                        const matches = tournament.pairings.filter(
+                          (p) => p.round === rnd
+                        );
+                        const hasDetailedCols = matches.some(
+                          (m) =>
+                            m.whiteSeed !== undefined ||
+                            m.blackSeed !== undefined ||
+                            m.whitePoints !== undefined ||
+                            m.blackPoints !== undefined
+                        );
+                        return (
+                          <div
+                            key={rnd}
+                            className="overflow-hidden rounded-md border border-slate-200"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-[#0F2342]">
+                              <span>Babak {rnd}</span>
+                              {isAdminMode && onUpdateTournament && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRound(rnd)}
+                                  className="inline-flex h-7 items-center gap-1 rounded border border-red-200 bg-white px-2 text-[11px] font-semibold text-[#B91C1C] hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3" aria-hidden="true" />
+                                  <span>Hapus Babak {rnd}</span>
+                                </button>
+                              )}
+                            </div>
                     {hasDetailedCols ? (
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[760px] table-fixed border-collapse text-left text-xs">
@@ -1410,7 +1616,11 @@ export function TournamentDetailModal({
                   </div>
                 );
               })}
-            </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()
           )}
         </div>
       </div>

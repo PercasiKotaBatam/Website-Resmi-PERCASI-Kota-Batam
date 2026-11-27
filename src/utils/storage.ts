@@ -262,6 +262,9 @@ export function readLocalPortalSnapshot(): {
   data: PortalData | null;
   localEdited: boolean;
 } {
+  if (typeof window === 'undefined') {
+    return { data: null, localEdited: false };
+  }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -297,45 +300,74 @@ export function savePortalData(
   data: PortalData,
   markLocalEdited = true
 ): PortalData {
+  let nextUpdatedAt = data.updatedAt;
+  if (markLocalEdited) {
+    const seedMs = Date.parse(SEED_PORTAL_DATA.updatedAt) || 0;
+    const dataMs = Date.parse(data.updatedAt) || 0;
+    const existingLocal = readLocalPortalSnapshot().data;
+    const existingMs = existingLocal ? Date.parse(existingLocal.updatedAt) || 0 : 0;
+    const monotonicMs = Math.max(
+      Date.now(),
+      seedMs + 1000,
+      dataMs + 1000,
+      existingMs + 1000
+    );
+    nextUpdatedAt = new Date(monotonicMs).toISOString();
+  }
+
   const payload: PortalData = {
     ...data,
-    updatedAt: markLocalEdited ? new Date().toISOString() : data.updatedAt,
+    updatedAt: nextUpdatedAt,
   };
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    const meta: PortalStorageMeta = {
-      localEdited: markLocalEdited,
-      updatedAt: payload.updatedAt,
-    };
-    window.localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
-  } catch {
-    // Ignore storage errors if private browsing blocks persistence
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      const meta: PortalStorageMeta = {
+        localEdited: markLocalEdited,
+        updatedAt: payload.updatedAt,
+      };
+      window.localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
+    } catch {
+      // Ignore storage errors if private browsing blocks persistence
+    }
   }
   return payload;
 }
 
 export function resetPortalData(): PortalData {
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-    window.localStorage.removeItem(STORAGE_META_KEY);
-  } catch {
-    // Ignore storage errors if private browsing blocks persistence
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(STORAGE_META_KEY);
+    } catch {
+      // Ignore storage errors if private browsing blocks persistence
+    }
   }
   return SEED_PORTAL_DATA;
 }
 
 export async function fetchPublishedPortalData(): Promise<PortalData | null> {
-  try {
-    const url = `${resolvePublicAssetUrl('data/portal-data.json')}?v=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const text = await res.text();
-    const validation = validatePortalBackup(text);
-    if (!validation.valid || !validation.data) return null;
-    return validation.data;
-  } catch {
-    return null;
+  const tryParseUrl = async (url: string): Promise<PortalData | null> => {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) return null;
+      const text = await res.text();
+      const validation = validatePortalBackup(text);
+      if (!validation.valid || !validation.data) return null;
+      return validation.data;
+    } catch {
+      return null;
+    }
+  };
+
+  const liveServerData = await tryParseUrl(`/api/portal-data?v=${Date.now()}`);
+  if (liveServerData) {
+    return liveServerData;
   }
+
+  const staticUrl = `${resolvePublicAssetUrl('data/portal-data.json')}?v=${Date.now()}`;
+  return tryParseUrl(staticUrl);
 }
 
 export async function syncPortalDataToServer(

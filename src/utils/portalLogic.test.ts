@@ -51,7 +51,7 @@ import {
   SEED_PORTAL_DATA,
   SEED_TOURNAMENTS,
 } from '../data/seedData';
-import { migratePortalData } from './storage';
+import { loadPortalData, migratePortalData, savePortalData } from './storage';
 import type { Athlete } from '../types/chess';
 
 const SAMPLE_ATHLETES: Athlete[] = [
@@ -1119,6 +1119,86 @@ test('Every participant across all SEED_TOURNAMENTS exists in SEED_ATHLETES with
   );
 });
 
+test('savePortalData monotonic timestamp preserves admin edits and pairings across refresh even when browser clock lags SEED_PORTAL_DATA', () => {
+  const store = new Map<string, string>();
+  const prevWindow = (globalThis as { window?: unknown }).window;
+  const prevNow = Date.now;
 
+  // Simulate an older client system clock (e.g. Jan 2025 while seedData is Nov 2026)
+  Date.now = () => Date.parse('2025-01-15T08:00:00.000Z');
+  (globalThis as { window?: unknown }).window = {
+    localStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    },
+  };
 
+  try {
+    const sampleRound1Bytes = generateSamplePairingsExcelBytes(1);
+    const parsedPairings = parsePairingsExcelBuffer(sampleRound1Bytes, 1);
+    assert.equal(parsedPairings.errors.length, 0);
+    assert.equal(parsedPairings.pairings.length, 3);
 
+    const editedData = {
+      ...SEED_PORTAL_DATA,
+      athletes: [
+        ...SEED_PORTAL_DATA.athletes,
+        {
+          id: 'ath-persisted-test',
+          fullName: 'Andi Persistensi',
+          title: 'Non-Gelar' as const,
+          category: 'Senior Putra' as const,
+          gender: 'Putra' as const,
+          club: 'Batam Chess Club',
+          city: 'Kota Batam' as const,
+          district: 'Batam Kota' as const,
+          ratings: { standard: 1720, rapid: 1750, blitz: 1700 },
+          bio: 'Uji persistensi.',
+          federationStatus: 'Atlet' as const,
+          tournamentHistory: [],
+        },
+      ],
+      tournaments: SEED_PORTAL_DATA.tournaments.map((t) =>
+        t.id === 'trn-darwin-cup-2026'
+          ? {
+              ...t,
+              venue: 'Gedung Baru Batam Center',
+              pairings: mergeRoundPairings(
+                t.pairings,
+                parsedPairings.pairings,
+                parsedPairings.detectedRounds
+              ),
+            }
+          : t
+      ),
+    };
+
+    const saved = savePortalData(editedData, true);
+    assert.ok(
+      Date.parse(saved.updatedAt) > Date.parse(SEED_PORTAL_DATA.updatedAt),
+      'Monotonic updatedAt must exceed SEED_PORTAL_DATA.updatedAt even when browser clock is behind'
+    );
+
+    const reloaded = loadPortalData();
+    assert.ok(
+      reloaded.athletes.some((a) => a.id === 'ath-persisted-test'),
+      'Added athlete must survive loadPortalData() refresh'
+    );
+    const reloadedDarwin = reloaded.tournaments.find((t) => t.id === 'trn-darwin-cup-2026');
+    assert.equal(reloadedDarwin?.venue, 'Gedung Baru Batam Center');
+    assert.equal(reloadedDarwin?.pairings.length, 3);
+    assert.equal(reloadedDarwin?.pairings[0]?.round, 1);
+  } finally {
+    Date.now = prevNow;
+    if (prevWindow === undefined) {
+      delete (globalThis as { window?: unknown }).window;
+    } else {
+      (globalThis as { window?: unknown }).window = prevWindow;
+    }
+  }
+});

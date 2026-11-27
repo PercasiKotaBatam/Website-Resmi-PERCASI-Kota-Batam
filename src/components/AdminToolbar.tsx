@@ -1,6 +1,9 @@
-import { Database, FileSpreadsheet, Shield, UserPlus } from 'lucide-react';
+import { CheckCircle2, Database, FileSpreadsheet, RefreshCw, Shield, UserPlus } from 'lucide-react';
+
+export type ProjectSyncStatus = 'idle' | 'syncing' | 'synced' | 'local-only';
 
 interface AdminToolbarProps {
+  syncStatus?: ProjectSyncStatus;
   onAddMember: () => void;
   onUploadTournament: () => void;
   onOpenBackup: () => void;
@@ -8,6 +11,7 @@ interface AdminToolbarProps {
 }
 
 export function AdminToolbar({
+  syncStatus = 'idle',
   onAddMember,
   onUploadTournament,
   onOpenBackup,
@@ -25,9 +29,25 @@ export function AdminToolbar({
           <span aria-hidden="true" className="text-amber-400">
             ·
           </span>
-          <span className="font-normal text-amber-900">
-            Tersimpan lokal di peramban
-          </span>
+          {syncStatus === 'syncing' ? (
+            <span className="inline-flex items-center gap-1 font-normal text-amber-900">
+              <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Menyinkronkan ke proyek...
+            </span>
+          ) : syncStatus === 'synced' ? (
+            <span className="inline-flex items-center gap-1 font-medium text-emerald-800">
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Tersimpan ke data proyek (siap push ke GitHub)
+            </span>
+          ) : syncStatus === 'local-only' ? (
+            <span className="font-normal text-amber-900">
+              Tersimpan lokal (ekspor portal-data.json untuk GitHub)
+            </span>
+          ) : (
+            <span className="font-normal text-amber-900">
+              Perubahan otomatis disinkronkan ke data proyek
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

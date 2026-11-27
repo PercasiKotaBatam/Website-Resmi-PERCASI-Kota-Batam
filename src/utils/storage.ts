@@ -14,9 +14,20 @@ import {
   SEED_TOURNAMENTS,
 } from '../data/seedData';
 import type { Athlete, PortalData } from '../types/chess';
-import { normalizeAthleteName, validatePortalBackup } from './portalLogic';
+import {
+  normalizeAthleteName,
+  pickAuthoritativePortalData,
+  resolvePublicAssetUrl,
+  validatePortalBackup,
+} from './portalLogic';
 
 const STORAGE_KEY = 'percasi_batam_portal_v3';
+const STORAGE_META_KEY = 'percasi_batam_portal_meta_v3';
+
+interface PortalStorageMeta {
+  localEdited: boolean;
+  updatedAt?: string;
+}
 
 const FIRDAUS_CUP_CANONICAL_PAIRINGS = [
   ...FIRDAUS_CUP_ROUND_1_PAIRINGS,
@@ -177,42 +188,113 @@ export function migratePortalData(data: PortalData): PortalData {
   };
 }
 
-export function loadPortalData(): PortalData {
+export function readLocalPortalSnapshot(): {
+  data: PortalData | null;
+  localEdited: boolean;
+} {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return SEED_PORTAL_DATA;
+      return { data: null, localEdited: false };
     }
     const validation = validatePortalBackup(raw);
-    if (validation.valid && validation.data) {
-      return migratePortalData(validation.data);
+    if (!validation.valid || !validation.data) {
+      return { data: null, localEdited: false };
     }
-    return SEED_PORTAL_DATA;
+    let localEdited = false;
+    const rawMeta = window.localStorage.getItem(STORAGE_META_KEY);
+    if (rawMeta) {
+      const parsedMeta = JSON.parse(rawMeta) as Partial<PortalStorageMeta>;
+      localEdited = Boolean(parsedMeta.localEdited);
+    }
+    return { data: validation.data, localEdited };
   } catch {
-    return SEED_PORTAL_DATA;
+    return { data: null, localEdited: false };
   }
 }
 
-export function savePortalData(data: PortalData): boolean {
+export function loadPortalData(): PortalData {
+  const { data, localEdited } = readLocalPortalSnapshot();
+  return pickAuthoritativePortalData({
+    seedData: SEED_PORTAL_DATA,
+    localData: data,
+    localEdited,
+    migrate: migratePortalData,
+  });
+}
+
+export function savePortalData(
+  data: PortalData,
+  markLocalEdited = true
+): PortalData {
+  const payload: PortalData = {
+    ...data,
+    updatedAt: markLocalEdited ? new Date().toISOString() : data.updatedAt,
+  };
   try {
-    const payload: PortalData = {
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    return true;
+    const meta: PortalStorageMeta = {
+      localEdited: markLocalEdited,
+      updatedAt: payload.updatedAt,
+    };
+    window.localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
   } catch {
-    return false;
+    // Ignore storage errors if private browsing blocks persistence
   }
+  return payload;
 }
 
 export function resetPortalData(): PortalData {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_PORTAL_DATA));
+    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(STORAGE_META_KEY);
   } catch {
     // Ignore storage errors if private browsing blocks persistence
   }
   return SEED_PORTAL_DATA;
+}
+
+export async function fetchPublishedPortalData(): Promise<PortalData | null> {
+  try {
+    const url = `${resolvePublicAssetUrl('data/portal-data.json')}?v=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const text = await res.text();
+    const validation = validatePortalBackup(text);
+    if (!validation.valid || !validation.data) return null;
+    return validation.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function syncPortalDataToServer(
+  data: PortalData,
+  adminToken: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/portal-data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      let errMsg = 'Gagal menyinkronkan data ke repositori proyek.';
+      try {
+        const body = (await res.json()) as { error?: string };
+        if (body.error) errMsg = body.error;
+      } catch {
+        // ignore JSON parse failure on non-JSON response (e.g. static host 404/405)
+      }
+      return { ok: false, error: errMsg };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Server penyinkronan tidak tersedia pada hosting statis.' };
+  }
 }
 
 export async function compressImageToBase64(

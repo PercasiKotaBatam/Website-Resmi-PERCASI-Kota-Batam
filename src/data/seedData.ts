@@ -8,7 +8,7 @@ import type {
   Tournament,
 } from '../types/chess';
 
-export const HERO_IMAGE_URL = './src/assets/images/hero_kejurkot_batam_1795156763743.jpg';
+export const HERO_IMAGE_URL = './assets/aistudio/IMG_20260919_105146_a1507b0b.jpg';
 export const NEWS_JUNIOR_IMAGE_URL = './src/assets/images/news_pembinaan_junior_1795156766513.jpg';
 export const NEWS_OPEN_IMAGE_URL = './src/assets/images/news_turnamen_open_1795156764325.jpg';
 
@@ -1032,7 +1032,7 @@ export const SEED_NEWS: NewsArticle[] = [];
 
 export const SEED_PORTAL_DATA: PortalData = {
   version: '3.0',
-  updatedAt: '2026-11-19T00:00:00.000Z',
+  updatedAt: '2026-11-27T06:00:00.000Z',
   athletes: SEED_ATHLETES,
   tournaments: SEED_TOURNAMENTS,
   news: SEED_NEWS,

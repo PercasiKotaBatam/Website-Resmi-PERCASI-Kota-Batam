@@ -1,17 +1,20 @@
 import 'dotenv/config';
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAdminAuthService } from './serverAuth.ts';
+import { validatePortalBackup } from './src/utils/portalLogic.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PORTAL_DATA_FILE = path.resolve(__dirname, 'public', 'data', 'portal-data.json');
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
 const authService = createAdminAuthService();
 
-app.use(express.json({ limit: '64kb' }));
+app.use('/api/admin', express.json({ limit: '64kb' }));
 
 // Simple in-memory rate limit for auth attempts per IP
 const authAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -101,6 +104,45 @@ app.get('/api/admin/session', (req, res) => {
 app.post('/api/admin/logout', (req, res) => {
   authService.revokeBearerToken(req.headers.authorization);
   res.json({ ok: true });
+});
+
+app.get('/api/portal-data', (_req, res) => {
+  if (!fs.existsSync(PORTAL_DATA_FILE)) {
+    res.status(404).json({ error: 'Data publikasi belum dibuat.' });
+    return;
+  }
+  try {
+    const raw = fs.readFileSync(PORTAL_DATA_FILE, 'utf8');
+    res.type('application/json').send(raw);
+  } catch {
+    res.status(500).json({ error: 'Gagal membaca berkas data portal.' });
+  }
+});
+
+app.post('/api/portal-data', express.json({ limit: '5mb' }), (req, res) => {
+  const check = authService.verifyBearerToken(req.headers.authorization);
+  if (!check.valid) {
+    res.status(401).json({ error: 'Otorisasi admin diperlukan untuk menyimpan perubahan proyek.' });
+    return;
+  }
+
+  const validation = validatePortalBackup(JSON.stringify(req.body ?? {}));
+  if (!validation.valid || !validation.data) {
+    res.status(400).json({
+      error: validation.error || 'Format data portal tidak valid.',
+    });
+    return;
+  }
+
+  try {
+    fs.mkdirSync(path.dirname(PORTAL_DATA_FILE), { recursive: true });
+    const tempFile = `${PORTAL_DATA_FILE}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(validation.data, null, 2), 'utf8');
+    fs.renameSync(tempFile, PORTAL_DATA_FILE);
+    res.json({ ok: true, updatedAt: validation.data.updatedAt });
+  } catch {
+    res.status(500).json({ error: 'Gagal menulis pembaruan data ke berkas proyek.' });
+  }
 });
 
 async function startServer() {

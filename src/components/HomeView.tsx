@@ -8,7 +8,7 @@ import type {
   RatingCategory,
   Tournament,
 } from '../types/chess';
-import { getTopAthletes } from '../utils/portalLogic';
+import { getTopAthletes, resolvePublicAssetUrl } from '../utils/portalLogic';
 import { AthleteAvatar } from './AthleteAvatar';
 import { TitleBadge, TournamentStatusText } from './TitleBadge';
 
@@ -244,8 +244,8 @@ export function HomeView({
           <div className="relative overflow-hidden rounded-lg border border-white/15 bg-[#09172E] lg:col-span-5">
             {!heroImgError ? (
               <img
-                src={HERO_IMAGE_URL}
-                alt="Suasana pertandingan Kejurkot Catur Kota Batam dengan papan kayu Staunton dan jam catur digital"
+                src={resolvePublicAssetUrl(HERO_IMAGE_URL)}
+                alt="Suasana pertandingan resmi turnamen catur Pengkot PERCASI Kota Batam"
                 referrerPolicy="no-referrer"
                 onError={() => setHeroImgError(true)}
                 className="h-64 w-full object-cover lg:h-full"
@@ -254,13 +254,13 @@ export function HomeView({
               <div className="flex h-64 w-full flex-col items-center justify-center bg-[#09172E] p-6 text-center lg:h-full">
                 <Trophy className="h-10 w-10 text-amber-400" aria-hidden="true" />
                 <p className="mt-2 text-sm font-semibold text-white">
-                  Kejurkot Catur Kota Batam 2026
+                  PERCASI Kota Batam 2026
                 </p>
               </div>
             )}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-4">
               <p className="text-xs font-medium text-slate-200">
-                Arena Kejurkot Catur Batam · Sistem Swiss 7 Babak Standar FIDE
+                Arena Pertandingan Resmi Pengkot PERCASI Kota Batam
               </p>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AboutView } from './components/AboutView';
 import { AdminLoginModal } from './components/AdminLoginModal';
-import { AdminToolbar } from './components/AdminToolbar';
+import { AdminToolbar, type ProjectSyncStatus } from './components/AdminToolbar';
 import { AthleteDetailView } from './components/AthleteDetailView';
 import { BackupModal } from './components/BackupModal';
 import { Footer } from './components/Footer';
@@ -15,6 +15,7 @@ import { NewsView } from './components/NewsView';
 import { TournamentDetailModal } from './components/TournamentDetailModal';
 import { TournamentsView } from './components/TournamentsView';
 import { UploadTournamentModal } from './components/UploadTournamentModal';
+import { SEED_PORTAL_DATA } from './data/seedData';
 import type {
   Athlete,
   NavSection,
@@ -22,10 +23,15 @@ import type {
   PortalData,
   Tournament,
 } from './types/chess';
+import { pickAuthoritativePortalData } from './utils/portalLogic';
 import {
+  fetchPublishedPortalData,
   loadPortalData,
+  migratePortalData,
+  readLocalPortalSnapshot,
   resetPortalData,
   savePortalData,
+  syncPortalDataToServer,
 } from './utils/storage';
 
 const SECTION_LABELS: Record<NavSection, string> = {
@@ -42,6 +48,7 @@ export default function App() {
   const [activeSection, setActiveSection] = useState<NavSection>('beranda');
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<ProjectSyncStatus>('idle');
 
   const isAdminMode = Boolean(adminToken);
 
@@ -59,8 +66,41 @@ export default function App() {
   const [backupOpen, setBackupOpen] = useState(false);
 
   useEffect(() => {
-    savePortalData(portalData);
-  }, [portalData]);
+    let cancelled = false;
+    void fetchPublishedPortalData().then((publishedData) => {
+      if (cancelled || !publishedData) return;
+      const { data: localData, localEdited } = readLocalPortalSnapshot();
+      const authoritative = pickAuthoritativePortalData({
+        seedData: SEED_PORTAL_DATA,
+        publishedData,
+        localData,
+        localEdited,
+        migrate: migratePortalData,
+      });
+      setPortalData(authoritative);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const commitPortalChange = (
+    nextData: PortalData,
+    options: { markLocalEdited?: boolean; tokenOverride?: string | null } = {}
+  ) => {
+    const { markLocalEdited = true, tokenOverride } = options;
+    const saved = savePortalData(nextData, markLocalEdited);
+    setPortalData(saved);
+    const activeToken = tokenOverride !== undefined ? tokenOverride : adminToken;
+    if (activeToken) {
+      setSyncStatus('syncing');
+      void syncPortalDataToServer(saved, activeToken).then((res) => {
+        setSyncStatus(res.ok ? 'synced' : 'local-only');
+      });
+    } else {
+      setSyncStatus('local-only');
+    }
+  };
 
   const handleNavigate = (section: NavSection) => {
     setSelectedAthleteTarget(null);
@@ -127,17 +167,19 @@ export default function App() {
   };
 
   const handleSaveMember = (athlete: Athlete, isEdit: boolean) => {
-    setPortalData((prev) => ({
-      ...prev,
+    const nextData: PortalData = {
+      ...portalData,
       athletes: isEdit
-        ? prev.athletes.map((a) => (a.id === athlete.id ? athlete : a))
-        : [athlete, ...prev.athletes],
-    }));
+        ? portalData.athletes.map((a) => (a.id === athlete.id ? athlete : a))
+        : [athlete, ...portalData.athletes],
+    };
+    commitPortalChange(nextData);
   };
 
   const handleLogoutAdmin = () => {
     const token = adminToken;
     setAdminToken(null);
+    setSyncStatus('idle');
     setMemberFormOpen(false);
     setUploadTournamentOpen(false);
     setEditingTournament(null);
@@ -162,6 +204,15 @@ export default function App() {
 
   const handleAdminAuthSuccess = (token: string) => {
     setAdminToken(token);
+    const { localEdited } = readLocalPortalSnapshot();
+    if (localEdited) {
+      setSyncStatus('syncing');
+      void syncPortalDataToServer(portalData, token).then((res) => {
+        setSyncStatus(res.ok ? 'synced' : 'local-only');
+      });
+    } else {
+      setSyncStatus('idle');
+    }
   };
 
   const handleOpenCreateTournament = () => {
@@ -175,12 +226,13 @@ export default function App() {
   };
 
   const handleSaveTournament = (tournament: Tournament, isEdit: boolean) => {
-    setPortalData((prev) => ({
-      ...prev,
+    const nextData: PortalData = {
+      ...portalData,
       tournaments: isEdit
-        ? prev.tournaments.map((t) => (t.id === tournament.id ? tournament : t))
-        : [tournament, ...prev.tournaments],
-    }));
+        ? portalData.tournaments.map((t) => (t.id === tournament.id ? tournament : t))
+        : [tournament, ...portalData.tournaments],
+    };
+    commitPortalChange(nextData);
     setSelectedAthleteTarget(null);
     setAthleteNavStack([]);
     setReturnTournamentId(null);
@@ -189,12 +241,20 @@ export default function App() {
   };
 
   const handleRestoreData = (restored: PortalData) => {
-    setPortalData(restored);
+    commitPortalChange(migratePortalData(restored));
   };
 
   const handleResetSeed = () => {
     const fresh = resetPortalData();
     setPortalData(fresh);
+    if (adminToken) {
+      setSyncStatus('syncing');
+      void syncPortalDataToServer(fresh, adminToken).then((res) => {
+        setSyncStatus(res.ok ? 'synced' : 'local-only');
+      });
+    } else {
+      setSyncStatus('idle');
+    }
   };
 
   const returnTournament = returnTournamentId
@@ -218,6 +278,7 @@ export default function App() {
 
       {isAdminMode && (
         <AdminToolbar
+          syncStatus={syncStatus}
           onAddMember={handleOpenAddMember}
           onUploadTournament={handleOpenCreateTournament}
           onOpenBackup={() => setBackupOpen(true)}

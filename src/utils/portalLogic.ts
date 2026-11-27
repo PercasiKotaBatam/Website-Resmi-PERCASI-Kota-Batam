@@ -1515,3 +1515,50 @@ export function filterPairingsByRound(
   if (selectedRound === 'all') return roundNumbers;
   return roundNumbers.filter((rnd) => rnd === selectedRound);
 }
+
+export function resolvePublicAssetUrl(assetPath: string, baseUrl?: string): string {
+  const cleanAsset = assetPath.replace(/^\.\//, '').replace(/^\/+/, '');
+  const resolvedBase =
+    baseUrl ??
+    ((import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? './');
+  if (!resolvedBase || resolvedBase === './') {
+    return `./${cleanAsset}`;
+  }
+  const normalizedBase = resolvedBase.endsWith('/')
+    ? resolvedBase
+    : `${resolvedBase}/`;
+  return `${normalizedBase}${cleanAsset}`;
+}
+
+function parseTimestampMs(iso?: string): number {
+  if (!iso) return 0;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+export function pickAuthoritativePortalData(options: {
+  seedData: PortalData;
+  publishedData?: PortalData | null;
+  localData?: PortalData | null;
+  localEdited?: boolean;
+  migrate: (data: PortalData) => PortalData;
+}): PortalData {
+  const { seedData, publishedData, localData, localEdited = false, migrate } = options;
+  const seedMs = parseTimestampMs(seedData.updatedAt);
+  const pubMs = publishedData ? parseTimestampMs(publishedData.updatedAt) : 0;
+
+  const deployedBase =
+    publishedData && pubMs >= seedMs ? migrate(publishedData) : migrate(seedData);
+  const deployedMs = Math.max(seedMs, pubMs);
+
+  if (!localData || !localEdited) {
+    return deployedBase;
+  }
+
+  const localMs = parseTimestampMs(localData.updatedAt);
+  if (localMs > deployedMs) {
+    return migrate(localData);
+  }
+  return deployedBase;
+}
+

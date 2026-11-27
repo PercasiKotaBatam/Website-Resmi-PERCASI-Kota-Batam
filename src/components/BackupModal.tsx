@@ -48,6 +48,18 @@ export function BackupModal({
     setStatusMessage('Berkas backup JSON berhasil diunduh.');
   };
 
+  const handleExportPortalDataJson = () => {
+    downloadTextFile(
+      'portal-data.json',
+      JSON.stringify(portalData, null, 2),
+      'application/json;charset=utf-8'
+    );
+    setErrorMessage('');
+    setStatusMessage(
+      'Berkas portal-data.json berhasil diunduh. Simpan di folder public/data/ sebelum push ke GitHub jika mengedit dari mode statis.'
+    );
+  };
+
   const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -140,6 +152,15 @@ export function BackupModal({
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               <span>Export / Unduh Backup JSON</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPortalDataJson}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-4 text-xs font-bold text-slate-800 hover:bg-slate-100"
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              <span>Unduh portal-data.json (Publikasi GitHub Pages)</span>
             </button>
 
             <label

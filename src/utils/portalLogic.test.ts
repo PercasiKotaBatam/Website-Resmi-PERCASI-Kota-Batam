@@ -19,6 +19,8 @@ import {
   parseStandingsCsv,
   parseStandingsExcelBuffer,
   parseStandingsJson,
+  pickAuthoritativePortalData,
+  resolvePublicAssetUrl,
   sortRatings,
   validatePortalBackup,
 } from './portalLogic';
@@ -33,6 +35,7 @@ import {
   FIRDAUS_CUP_ROUND_6_PAIRINGS,
   FIRDAUS_CUP_ROUND_7_PAIRINGS,
   FIRDAUS_CUP_STANDINGS,
+  HERO_IMAGE_URL,
   SEED_ATHLETES,
   SEED_NEWS,
   SEED_PORTAL_DATA,
@@ -623,3 +626,81 @@ test('parsePairingsExcelBuffer and mergeRoundPairings parse .xlsx/.xls Swiss-Man
   assert.equal(csvResult.pairings[0]?.round, 3);
   assert.equal(csvResult.pairings[0]?.result, '1 - 0');
 });
+
+test('HERO_IMAGE_URL points to uploaded tournament photo and resolvePublicAssetUrl handles GitHub Pages subpaths', () => {
+  assert.equal(HERO_IMAGE_URL, './assets/aistudio/IMG_20260919_105146_a1507b0b.jpg');
+  assert.equal(
+    resolvePublicAssetUrl(HERO_IMAGE_URL, './'),
+    './assets/aistudio/IMG_20260919_105146_a1507b0b.jpg'
+  );
+  assert.equal(
+    resolvePublicAssetUrl(HERO_IMAGE_URL, '/percasi-batam/'),
+    '/percasi-batam/assets/aistudio/IMG_20260919_105146_a1507b0b.jpg'
+  );
+  assert.equal(
+    resolvePublicAssetUrl('data/portal-data.json', '/percasi-batam'),
+    '/percasi-batam/data/portal-data.json'
+  );
+});
+
+test('pickAuthoritativePortalData ignores stale passive localStorage cache and honors newer published or admin-edited snapshots', () => {
+  const stalePassiveLocal = {
+    ...SEED_PORTAL_DATA,
+    updatedAt: '2026-12-01T00:00:00.000Z',
+    tournaments: [SEED_PORTAL_DATA.tournaments[0]!],
+  };
+  const resolvedVisitor = pickAuthoritativePortalData({
+    seedData: SEED_PORTAL_DATA,
+    publishedData: null,
+    localData: stalePassiveLocal,
+    localEdited: false,
+    migrate: migratePortalData,
+  });
+  assert.equal(resolvedVisitor.tournaments.length, 2);
+  assert.equal(resolvedVisitor.tournaments[1]?.id, 'trn-darwin-cup-2026');
+
+  const newerPublished = {
+    ...SEED_PORTAL_DATA,
+    updatedAt: '2026-11-28T10:00:00.000Z',
+    tournaments: [
+      ...SEED_PORTAL_DATA.tournaments,
+      {
+        ...SEED_PORTAL_DATA.tournaments[1]!,
+        id: 'trn-published-new',
+        name: 'Batam Open 2026',
+      },
+    ],
+  };
+  const resolvedWithPublished = pickAuthoritativePortalData({
+    seedData: SEED_PORTAL_DATA,
+    publishedData: newerPublished,
+    localData: stalePassiveLocal,
+    localEdited: false,
+    migrate: migratePortalData,
+  });
+  assert.equal(resolvedWithPublished.tournaments.length, 3);
+  assert.equal(resolvedWithPublished.tournaments[2]?.name, 'Batam Open 2026');
+
+  const newerLocalAdmin = {
+    ...newerPublished,
+    updatedAt: '2026-11-29T10:00:00.000Z',
+    tournaments: [
+      ...newerPublished.tournaments,
+      {
+        ...SEED_PORTAL_DATA.tournaments[1]!,
+        id: 'trn-local-new',
+        name: 'Walikota Cup 2026',
+      },
+    ],
+  };
+  const resolvedAdmin = pickAuthoritativePortalData({
+    seedData: SEED_PORTAL_DATA,
+    publishedData: newerPublished,
+    localData: newerLocalAdmin,
+    localEdited: true,
+    migrate: migratePortalData,
+  });
+  assert.equal(resolvedAdmin.tournaments.length, 4);
+  assert.equal(resolvedAdmin.tournaments[3]?.name, 'Walikota Cup 2026');
+});
+

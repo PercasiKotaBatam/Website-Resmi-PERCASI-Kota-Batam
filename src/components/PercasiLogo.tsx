@@ -1,3 +1,5 @@
+import { resolvePublicAssetUrl } from '../utils/portalLogic';
+
 interface PercasiLogoProps {
   className?: string;
 }
@@ -5,7 +7,7 @@ interface PercasiLogoProps {
 export function PercasiLogo({ className = 'w-9 h-9' }: PercasiLogoProps) {
   return (
     <img
-      src="./assets/aistudio/Logo_Percasi_Kota_Batam_f72a3db5.png"
+      src={resolvePublicAssetUrl('assets/aistudio/Logo_Percasi_Kota_Batam_f72a3db5.png')}
       alt=""
       aria-hidden="true"
       className={`${className} object-contain`}

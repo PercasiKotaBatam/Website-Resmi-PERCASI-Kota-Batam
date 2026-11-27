@@ -11,17 +11,21 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { InitialRankEntry, Tournament } from '../types/chess';
+import type { Athlete, InitialRankEntry, Tournament } from '../types/chess';
 import {
   buildInitialRankings,
   filterPairingsByRound,
   formatRatingDelta,
+  getPlayerDisplayParts,
+  resolvePlayerMasterTitle,
   sortInitialRankings,
+  stripTitleSuffix,
 } from '../utils/portalLogic';
 import { TitleBadge, TournamentStatusText } from './TitleBadge';
 
 interface TournamentDetailModalProps {
   tournament: Tournament | null;
+  athletes?: Athlete[];
   isAdminMode?: boolean;
   onClose: () => void;
   onSelectAthlete: (athleteName: string, tournamentId: string) => void;
@@ -45,12 +49,14 @@ interface EditableInitialRankRow {
 
 function toEditableInitialRankRow(
   entry: InitialRankEntry,
-  idx: number
+  idx: number,
+  athletes: Athlete[] = []
 ): EditableInitialRankRow {
+  const resolvedTitle = resolvePlayerMasterTitle(entry.name, athletes, entry.title);
   return {
     rowKey: `ir-${idx}-${entry.sNo}-${entry.name}`,
     sNo: String(entry.sNo ?? idx + 1),
-    name: entry.name ?? '',
+    name: stripTitleSuffix(entry.name ?? ''),
     gender: entry.gender ?? 'Putra',
     rating:
       entry.rating !== undefined && entry.rating !== '-'
@@ -66,7 +72,7 @@ function toEditableInitialRankRow(
         : '',
     fed: entry.fed ?? 'INA',
     clubCity: entry.clubCity ?? entry.club ?? '',
-    title: entry.title,
+    title: resolvedTitle ?? entry.title,
     category: entry.category,
   };
 }
@@ -85,10 +91,12 @@ function fromEditableInitialRankRow(
 ): InitialRankEntry {
   const parsedSNo = Number.parseInt(row.sNo.trim(), 10);
   const sNo = Number.isFinite(parsedSNo) && parsedSNo > 0 ? parsedSNo : idx + 1;
-  const cleanName = row.name.trim();
+  const resolvedTitle = resolvePlayerMasterTitle(row.name, [], row.title);
+  const cleanName = stripTitleSuffix(row.name.trim());
   const cleanClub = row.clubCity.trim() || '-';
   const cleanFed = row.fed.trim().toUpperCase() || 'INA';
   const cleanGender = row.gender.trim() || 'Putra';
+  const effectiveTitle = resolvedTitle ?? row.title;
 
   if (useDualRating) {
     return {
@@ -99,7 +107,7 @@ function fromEditableInitialRankRow(
       internationalRating: parseRatingField(row.internationalRating),
       fed: cleanFed,
       clubCity: cleanClub,
-      ...(row.title ? { title: row.title } : {}),
+      ...(effectiveTitle ? { title: effectiveTitle } : {}),
       ...(row.category ? { category: row.category } : {}),
     };
   }
@@ -111,13 +119,14 @@ function fromEditableInitialRankRow(
     rating: parseRatingField(row.rating || row.nationalRating),
     fed: cleanFed,
     clubCity: cleanClub,
-    ...(row.title ? { title: row.title } : {}),
+    ...(effectiveTitle ? { title: effectiveTitle } : {}),
     ...(row.category ? { category: row.category } : {}),
   };
 }
 
 export function TournamentDetailModal({
   tournament,
+  athletes = [],
   isAdminMode = false,
   onClose,
   onSelectAthlete,
@@ -367,7 +376,13 @@ export function TournamentDetailModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {tournament.standings.map((row) => (
+                      {tournament.standings.map((row) => {
+                        const { displayName, masterTitle } = getPlayerDisplayParts(
+                          row.name,
+                          athletes,
+                          row.title
+                        );
+                        return (
                         <tr
                           key={`${row.rank}-${row.name}`}
                           className="hover:bg-slate-50"
@@ -379,13 +394,16 @@ export function TournamentDetailModal({
                             {row.sNo ?? '-'}
                           </td>
                           <td className="px-3 py-2 font-semibold text-slate-900">
-                            <button
-                              type="button"
-                              onClick={() => onSelectAthlete(row.name, tournament.id)}
-                              className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                            >
-                              {row.name}
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              {masterTitle && <TitleBadge title={masterTitle} />}
+                              <button
+                                type="button"
+                                onClick={() => onSelectAthlete(row.name, tournament.id)}
+                                className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                              >
+                                {displayName}
+                              </button>
+                            </div>
                           </td>
                           <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
                             {row.rating ?? '-'}
@@ -412,7 +430,8 @@ export function TournamentDetailModal({
                             {row.ps ?? '-'}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -447,7 +466,13 @@ export function TournamentDetailModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {tournament.standings.map((row) => (
+                      {tournament.standings.map((row) => {
+                        const { displayName, masterTitle } = getPlayerDisplayParts(
+                          row.name,
+                          athletes,
+                          row.title
+                        );
+                        return (
                         <tr
                           key={`${row.rank}-${row.name}`}
                           className="hover:bg-slate-50"
@@ -456,7 +481,7 @@ export function TournamentDetailModal({
                             #{row.rank}
                           </td>
                           <td className="px-3 py-2.5">
-                            <TitleBadge title={row.title} />
+                            <TitleBadge title={masterTitle ?? row.title} />
                           </td>
                           <td className="px-3 py-2.5 font-semibold text-slate-900">
                             <button
@@ -464,7 +489,7 @@ export function TournamentDetailModal({
                               onClick={() => onSelectAthlete(row.name, tournament.id)}
                               className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
                             >
-                              {row.name}
+                              {displayName}
                             </button>
                           </td>
                           <td className="px-3 py-2.5 text-xs text-slate-600">
@@ -488,7 +513,8 @@ export function TournamentDetailModal({
                             {formatRatingDelta(row.ratingChange)}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -510,7 +536,7 @@ export function TournamentDetailModal({
               const startEditingInitialRank = () => {
                 setDraftInitialRows(
                   initialRankings.map((entry, idx) =>
-                    toEditableInitialRankRow(entry, idx)
+                    toEditableInitialRankRow(entry, idx, athletes)
                   )
                 );
                 setInitialEditQuery('');
@@ -545,7 +571,9 @@ export function TournamentDetailModal({
                 );
                 const sorted = sortInitialRankings(converted);
                 setDraftInitialRows(
-                  sorted.map((entry, idx) => toEditableInitialRankRow(entry, idx))
+                  sorted.map((entry, idx) =>
+                    toEditableInitialRankRow(entry, idx, athletes)
+                  )
                 );
                 setInitialEditError('');
               };
@@ -894,7 +922,14 @@ export function TournamentDetailModal({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {initialRankings.map((row, idx) => (
+                            {initialRankings.map((row, idx) => {
+                              const { displayName, masterTitle } =
+                                getPlayerDisplayParts(
+                                  row.name,
+                                  athletes,
+                                  row.title
+                                );
+                              return (
                               <tr
                                 key={`init-ext-${row.sNo}-${row.name}-${idx}`}
                                 className="hover:bg-slate-50"
@@ -903,13 +938,16 @@ export function TournamentDetailModal({
                                   {row.sNo}
                                 </td>
                                 <td className="px-3 py-2 font-semibold text-slate-900">
-                                  <button
-                                    type="button"
-                                    onClick={() => onSelectAthlete(row.name, tournament.id)}
-                                    className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                  >
-                                    {row.name}
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    {masterTitle && <TitleBadge title={masterTitle} />}
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectAthlete(row.name, tournament.id)}
+                                      className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                    >
+                                      {displayName}
+                                    </button>
+                                  </div>
                                 </td>
                                 <td className="px-3 py-2 text-center text-slate-700 whitespace-nowrap">
                                   {row.gender ?? '-'}
@@ -927,7 +965,8 @@ export function TournamentDetailModal({
                                   {row.clubCity ?? row.club ?? '-'}
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -959,7 +998,14 @@ export function TournamentDetailModal({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {initialRankings.map((row, idx) => (
+                            {initialRankings.map((row, idx) => {
+                              const { displayName, masterTitle } =
+                                getPlayerDisplayParts(
+                                  row.name,
+                                  athletes,
+                                  row.title
+                                );
+                              return (
                               <tr
                                 key={`init-rtg-${row.sNo}-${row.name}-${idx}`}
                                 className="hover:bg-slate-50"
@@ -968,13 +1014,16 @@ export function TournamentDetailModal({
                                   {row.sNo}
                                 </td>
                                 <td className="px-3 py-2 font-semibold text-slate-900">
-                                  <button
-                                    type="button"
-                                    onClick={() => onSelectAthlete(row.name, tournament.id)}
-                                    className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                  >
-                                    {row.name}
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    {masterTitle && <TitleBadge title={masterTitle} />}
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectAthlete(row.name, tournament.id)}
+                                      className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                    >
+                                      {displayName}
+                                    </button>
+                                  </div>
                                 </td>
                                 <td className="px-3 py-2 text-center text-slate-700 whitespace-nowrap">
                                   {row.gender ?? '-'}
@@ -989,7 +1038,8 @@ export function TournamentDetailModal({
                                   {row.clubCity ?? row.club ?? '-'}
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1018,7 +1068,14 @@ export function TournamentDetailModal({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {initialRankings.map((row, idx) => (
+                            {initialRankings.map((row, idx) => {
+                              const { displayName, masterTitle } =
+                                getPlayerDisplayParts(
+                                  row.name,
+                                  athletes,
+                                  row.title
+                                );
+                              return (
                               <tr
                                 key={`init-${row.sNo}-${row.name}-${idx}`}
                                 className="hover:bg-slate-50"
@@ -1027,13 +1084,16 @@ export function TournamentDetailModal({
                                   {row.sNo ?? idx + 1}
                                 </td>
                                 <td className="px-3 py-2 font-semibold text-slate-900">
-                                  <button
-                                    type="button"
-                                    onClick={() => onSelectAthlete(row.name, tournament.id)}
-                                    className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                  >
-                                    {row.name}
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    {masterTitle && <TitleBadge title={masterTitle} />}
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectAthlete(row.name, tournament.id)}
+                                      className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                    >
+                                      {displayName}
+                                    </button>
+                                  </div>
                                 </td>
                                 <td className="font-mono-tabular px-3 py-2 text-center text-slate-700">
                                   {row.rating ?? '-'}
@@ -1045,7 +1105,8 @@ export function TournamentDetailModal({
                                   {row.category ?? '-'}
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1071,7 +1132,14 @@ export function TournamentDetailModal({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {initialRankings.map((row, idx) => (
+                            {initialRankings.map((row, idx) => {
+                              const { displayName, masterTitle } =
+                                getPlayerDisplayParts(
+                                  row.name,
+                                  athletes,
+                                  row.title
+                                );
+                              return (
                               <tr
                                 key={`init-${idx}-${row.name}`}
                                 className="hover:bg-slate-50"
@@ -1080,7 +1148,9 @@ export function TournamentDetailModal({
                                   #{row.sNo ?? idx + 1}
                                 </td>
                                 <td className="px-3 py-2.5">
-                                  <TitleBadge title={row.title ?? 'Non-Gelar'} />
+                                  <TitleBadge
+                                    title={masterTitle ?? row.title ?? 'Non-Gelar'}
+                                  />
                                 </td>
                                 <td className="px-3 py-2.5 font-semibold text-slate-900">
                                   <button
@@ -1088,14 +1158,15 @@ export function TournamentDetailModal({
                                     onClick={() => onSelectAthlete(row.name, tournament.id)}
                                     className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
                                   >
-                                    {row.name}
+                                    {displayName}
                                   </button>
                                 </td>
                                 <td className="px-3 py-2.5 text-xs text-slate-600">
                                   {row.club ?? '-'}
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1199,7 +1270,18 @@ export function TournamentDetailModal({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {matches.map((m) => (
+                            {matches.map((m) => {
+                              const whiteParts = getPlayerDisplayParts(
+                                m.whiteName,
+                                athletes,
+                                m.whiteTitle
+                              );
+                              const blackParts = getPlayerDisplayParts(
+                                m.blackName,
+                                athletes,
+                                m.blackTitle
+                              );
+                              return (
                               <tr key={`${rnd}-${m.board}`} className="hover:bg-slate-50">
                                 <td className="font-mono-tabular px-2.5 py-2 text-center font-semibold text-slate-500">
                                   {m.board}
@@ -1208,18 +1290,18 @@ export function TournamentDetailModal({
                                   {m.whiteSeed ?? '-'}
                                 </td>
                                 <td className="px-3 py-2 font-semibold text-slate-900">
-                                  {m.whiteTitle && m.whiteTitle !== 'Non-Gelar' && (
-                                    <span className="font-mono-tabular mr-1.5 text-[11px] font-bold text-[#0F2342]">
-                                      {m.whiteTitle}
-                                    </span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => onSelectAthlete(m.whiteName, tournament.id)}
-                                    className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                  >
-                                    {m.whiteName}
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    {whiteParts.masterTitle && (
+                                      <TitleBadge title={whiteParts.masterTitle} />
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectAthlete(m.whiteName, tournament.id)}
+                                      className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                    >
+                                      {whiteParts.displayName}
+                                    </button>
+                                  </div>
                                 </td>
                                 <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
                                   {m.whitePoints ?? '-'}
@@ -1231,24 +1313,25 @@ export function TournamentDetailModal({
                                   {m.blackPoints ?? '-'}
                                 </td>
                                 <td className="px-3 py-2 font-semibold text-slate-900">
-                                  {m.blackTitle && m.blackTitle !== 'Non-Gelar' && (
-                                    <span className="font-mono-tabular mr-1.5 text-[11px] font-bold text-[#0F2342]">
-                                      {m.blackTitle}
-                                    </span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => onSelectAthlete(m.blackName, tournament.id)}
-                                    className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                  >
-                                    {m.blackName}
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    {blackParts.masterTitle && (
+                                      <TitleBadge title={blackParts.masterTitle} />
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectAthlete(m.blackName, tournament.id)}
+                                      className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                    >
+                                      {blackParts.displayName}
+                                    </button>
+                                  </div>
                                 </td>
                                 <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-600">
                                   {m.blackSeed ?? '-'}
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1271,44 +1354,56 @@ export function TournamentDetailModal({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {matches.map((m) => (
+                          {matches.map((m) => {
+                            const whiteParts = getPlayerDisplayParts(
+                              m.whiteName,
+                              athletes,
+                              m.whiteTitle
+                            );
+                            const blackParts = getPlayerDisplayParts(
+                              m.blackName,
+                              athletes,
+                              m.blackTitle
+                            );
+                            return (
                             <tr key={`${rnd}-${m.board}`}>
                               <td className="font-mono-tabular px-3 py-2.5 font-semibold text-slate-500">
                                 {m.board}
                               </td>
                               <td className="px-3 py-2.5 font-semibold text-slate-900">
-                                {m.whiteTitle && m.whiteTitle !== 'Non-Gelar' && (
-                                  <span className="font-mono-tabular mr-1.5 text-[11px] font-bold text-[#0F2342]">
-                                    {m.whiteTitle}
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectAthlete(m.whiteName, tournament.id)}
-                                  className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                >
-                                  {m.whiteName}
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  {whiteParts.masterTitle && (
+                                    <TitleBadge title={whiteParts.masterTitle} />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectAthlete(m.whiteName, tournament.id)}
+                                    className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                  >
+                                    {whiteParts.displayName}
+                                  </button>
+                                </div>
                               </td>
                               <td className="font-mono-tabular px-3 py-2.5 text-center font-bold text-[#0F2342]">
                                 {m.result === '*' ? 'Berlangsung' : m.result}
                               </td>
                               <td className="px-3 py-2.5 text-right font-semibold text-slate-900">
-                                {m.blackTitle && m.blackTitle !== 'Non-Gelar' && (
-                                  <span className="font-mono-tabular mr-1.5 text-[11px] font-bold text-[#0F2342]">
-                                    {m.blackTitle}
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectAthlete(m.blackName, tournament.id)}
-                                  className="text-right font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                >
-                                  {m.blackName}
-                                </button>
+                                <div className="inline-flex items-center justify-end gap-1.5">
+                                  {blackParts.masterTitle && (
+                                    <TitleBadge title={blackParts.masterTitle} />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectAthlete(m.blackName, tournament.id)}
+                                    className="text-right font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                  >
+                                    {blackParts.displayName}
+                                  </button>
+                                </div>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     )}

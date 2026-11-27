@@ -4,15 +4,19 @@ import type {
   Athlete,
   AthleteCategory,
   BatamDistrict,
+  KepriCity,
   TitleCode,
 } from '../types/chess';
 import {
   CATEGORY_OPTIONS,
+  CITY_OPTIONS,
   DISTRICT_OPTIONS,
   TITLE_OPTIONS,
   calculateAthleteAge,
   filterAthletes,
   formatAthleteBirthDisplay,
+  formatAthleteLocation,
+  getAthleteCity,
 } from '../utils/portalLogic';
 import { AthleteAvatar } from './AthleteAvatar';
 import { TitleBadge } from './TitleBadge';
@@ -35,6 +39,7 @@ export function MembersView({
   const [query, setQuery] = useState('');
   const [titleFilter, setTitleFilter] = useState<TitleCode | 'Semua'>('Semua');
   const [categoryFilter, setCategoryFilter] = useState<AthleteCategory | 'Semua'>('Semua');
+  const [cityFilter, setCityFilter] = useState<KepriCity | 'Semua'>('Semua');
   const [districtFilter, setDistrictFilter] = useState<BatamDistrict | 'Semua'>('Semua');
 
   const filteredAthletes = useMemo(
@@ -43,21 +48,24 @@ export function MembersView({
         query,
         title: titleFilter,
         category: categoryFilter,
+        city: cityFilter,
         district: districtFilter,
       }),
-    [athletes, query, titleFilter, categoryFilter, districtFilter]
+    [athletes, query, titleFilter, categoryFilter, cityFilter, districtFilter]
   );
 
   const hasActiveFilters =
     Boolean(query.trim()) ||
     titleFilter !== 'Semua' ||
     categoryFilter !== 'Semua' ||
+    cityFilter !== 'Semua' ||
     districtFilter !== 'Semua';
 
   const resetFilters = () => {
     setQuery('');
     setTitleFilter('Semua');
     setCategoryFilter('Semua');
+    setCityFilter('Semua');
     setDistrictFilter('Semua');
   };
 
@@ -69,7 +77,7 @@ export function MembersView({
             Basis Data Resmi Atlet
           </p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-[#0F2342] sm:text-3xl">
-            Keanggotaan &amp; Profil Atlet Batam
+            Keanggotaan &amp; Profil Atlet Kepulauan Riau
           </h1>
           <p className="mt-1.5 text-sm text-slate-600">
             Menampilkan{' '}
@@ -80,7 +88,7 @@ export function MembersView({
             <span className="font-mono-tabular font-bold text-[#0F2342]">
               {athletes.length}
             </span>{' '}
-            atlet terdaftar di Pengkot PERCASI Kota Batam.
+            atlet terdaftar di Provinsi Kepulauan Riau.
           </p>
         </div>
 
@@ -97,13 +105,13 @@ export function MembersView({
       </div>
 
       {/* Filter Bar */}
-      <div className="mt-6 grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="lg:col-span-2">
+      <div className="mt-6 grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="sm:col-span-2 lg:col-span-2">
           <label
             htmlFor="member-search"
             className="mb-1.5 block text-xs font-semibold text-slate-700"
           >
-            Cari Nama / Klub / Kecamatan
+            Cari Nama / Klub / Kota / Kecamatan
           </label>
           <div className="relative">
             <Search
@@ -115,10 +123,38 @@ export function MembersView({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Contoh: Godfrid, Semanggi, Batam Kota..."
+              placeholder="Contoh: Godfrid, Tanjung Pinang, Bintan..."
               className="h-10 w-full rounded-md border border-slate-300 bg-white pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F2342] focus:outline-none"
             />
           </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="filter-city"
+            className="mb-1.5 block text-xs font-semibold text-slate-700"
+          >
+            Kota
+          </label>
+          <select
+            id="filter-city"
+            value={cityFilter}
+            onChange={(e) => {
+              const nextCity = e.target.value as KepriCity | 'Semua';
+              setCityFilter(nextCity);
+              if (nextCity !== 'Semua' && nextCity !== 'Kota Batam') {
+                setDistrictFilter('Semua');
+              }
+            }}
+            className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#0F2342] focus:outline-none"
+          >
+            <option value="Semua">Semua Kota</option>
+            {CITY_OPTIONS.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -172,7 +208,7 @@ export function MembersView({
             htmlFor="filter-district"
             className="mb-1.5 block text-xs font-semibold text-slate-700"
           >
-            Klub / Kecamatan
+            Kecamatan (Batam)
           </label>
           <select
             id="filter-district"
@@ -212,7 +248,7 @@ export function MembersView({
             Tidak ada atlet yang sesuai dengan filter pencarian
           </p>
           <p className="mt-1 text-sm text-slate-600">
-            Ubah kata kunci pencarian atau atur ulang pilihan filter gelar,
+            Ubah kata kunci pencarian atau atur ulang pilihan filter kota, gelar,
             kategori, dan kecamatan.
           </p>
           <button
@@ -237,6 +273,12 @@ export function MembersView({
               athlete.birthDate,
               athlete.birthYear
             );
+            const athleteCity = getAthleteCity(athlete);
+            const locationDisplay = formatAthleteLocation({
+              club: athlete.club,
+              city: athleteCity,
+              district: athlete.district,
+            });
             return (
               <article
                 key={athlete.id}
@@ -272,18 +314,25 @@ export function MembersView({
                       </button>
                     </h2>
                     <p className="mt-0.5 truncate text-xs text-slate-600">
-                      {athlete.club} ·{' '}
                       <span className="font-medium text-slate-800">
-                        Kec. {athlete.district}
+                        {locationDisplay}
                       </span>
                     </p>
                   </div>
                 </div>
 
-                {/* Birth Date, Age, Ratings & Actions */}
+                {/* City, Birth Date, Age, Ratings & Actions */}
                 <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center lg:border-t-0 lg:pt-0 lg:gap-5">
-                  <div className="grid grid-cols-2 gap-4 sm:flex sm:items-center sm:gap-5">
-                    <div className="min-w-[118px]">
+                  <div className="grid grid-cols-3 gap-4 sm:flex sm:items-center sm:gap-5">
+                    <div className="min-w-[108px]">
+                      <p className="text-[11px] font-medium text-slate-500">
+                        Asal Kota
+                      </p>
+                      <p className="mt-0.5 text-xs font-semibold text-slate-900">
+                        {athleteCity}
+                      </p>
+                    </div>
+                    <div className="min-w-[114px]">
                       <p className="text-[11px] font-medium text-slate-500">
                         Tanggal Lahir
                       </p>
@@ -291,7 +340,7 @@ export function MembersView({
                         {birthDisplay}
                       </p>
                     </div>
-                    <div className="min-w-[74px]">
+                    <div className="min-w-[68px]">
                       <p className="text-[11px] font-medium text-slate-500">
                         Umur
                       </p>

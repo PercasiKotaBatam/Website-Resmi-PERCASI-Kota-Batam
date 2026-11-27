@@ -4,7 +4,9 @@ import type { Athlete } from '../types/chess';
 import {
   buildAthleteDetailProfile,
   formatAthleteBirthDisplay,
+  formatAthleteLocation,
   formatRatingDelta,
+  getPlayerDisplayParts,
   type ColorWdlStats,
 } from '../utils/portalLogic';
 import type { Tournament } from '../types/chess';
@@ -224,12 +226,18 @@ export function AthleteDetailView({
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
                   <span>
-                    {profile.club !== '-'
-                      ? `${profile.club}${profile.district ? ` · Kec. ${profile.district}, Kota Batam` : ''}`
-                      : profile.district
-                        ? `Kec. ${profile.district}, Kota Batam`
-                        : 'Kota Batam'}
+                    {formatAthleteLocation({
+                      club: profile.club,
+                      city: profile.city,
+                      district: profile.district,
+                    })}
                   </span>
+                </span>
+                <span>
+                  Asal Kota:{' '}
+                  <strong className="text-slate-900">
+                    {profile.city || 'Kota Batam'}
+                  </strong>
                 </span>
                 <span className="font-mono-tabular">
                   Tanggal Lahir:{' '}
@@ -620,18 +628,28 @@ export function AthleteDetailView({
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => onSelectAthlete(m.opponentName)}
-                            className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                          >
-                            {m.opponentName}
-                          </button>
-                          {m.opponentSeed !== undefined && (
-                            <span className="font-mono-tabular ml-1.5 text-[11px] text-slate-400">
-                              (No. {m.opponentSeed})
-                            </span>
-                          )}
+                          {(() => {
+                            const oppParts = getPlayerDisplayParts(m.opponentName, athletes);
+                            return (
+                              <div className="inline-flex flex-wrap items-center gap-1.5">
+                                {oppParts.masterTitle && (
+                                  <TitleBadge title={oppParts.masterTitle} />
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectAthlete(m.opponentName)}
+                                  className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                >
+                                  {oppParts.displayName}
+                                </button>
+                                {m.opponentSeed !== undefined && (
+                                  <span className="font-mono-tabular text-[11px] text-slate-400">
+                                    (No. {m.opponentSeed})
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="font-mono-tabular px-4 py-3 text-center font-bold text-[#0F2342] whitespace-nowrap">
                           {m.result === '*' ? 'Berlangsung' : m.result}

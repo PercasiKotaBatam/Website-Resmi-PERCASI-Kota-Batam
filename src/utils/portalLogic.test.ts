@@ -5,15 +5,20 @@ import {
   buildAthleteDetailProfile,
   buildInitialRankings,
   calculateAthleteAge,
+  CITY_OPTIONS,
   evaluatePairingOutcome,
   filterAthletes,
   filterPairingsByRound,
   formatAthleteBirthDisplay,
+  formatAthleteLocation,
+  formatPlayerNameWithMasterTitle,
   formatRatingDelta,
   generateSampleCsvTemplate,
   generateSampleExcelBytes,
   generateSamplePairingsExcelBytes,
+  getAthleteCity,
   getInitials,
+  getPlayerDisplayParts,
   mergeRoundPairings,
   normalizeAthleteName,
   parsePairingsCsv,
@@ -22,9 +27,11 @@ import {
   parseStandingsExcelBuffer,
   parseStandingsJson,
   pickAuthoritativePortalData,
+  resolvePlayerMasterTitle,
   resolvePublicAssetUrl,
   sortInitialRankings,
   sortRatings,
+  syncAthletesFromTournaments,
   validatePortalBackup,
 } from './portalLogic';
 import {
@@ -398,9 +405,16 @@ test('Firdaus Cup 2026 and Darwin Cup 2026 exist in seed with 148-player initial
   assert.equal(customInitial.length, 148);
   assert.equal(customInitial[0]?.sNo, 1);
   assert.equal(customInitial[0]?.name, 'Godfrid Harry Mollyson Siregar');
+  assert.equal(customInitial[0]?.title, 'NM');
   assert.equal(customInitial[0]?.gender, 'Putra');
   assert.equal(customInitial[0]?.nationalRating, 2243);
   assert.equal(customInitial[0]?.clubCity, 'Sagulung');
+  assert.equal(customInitial[1]?.name, 'Sahat Sitanggang');
+  assert.equal(customInitial[1]?.title, 'NM');
+  assert.equal(customInitial[3]?.name, 'Suhandri');
+  assert.equal(customInitial[3]?.title, 'MP');
+  assert.equal(customInitial[4]?.name, 'Nurdin Simanjuntak');
+  assert.equal(customInitial[4]?.title, 'NM');
   assert.equal(customInitial[5]?.name, 'Jonathan Charmian Vivaldy');
   assert.equal(customInitial[5]?.nationalRating, 1896);
   assert.equal(customInitial[5]?.internationalRating, 1875);
@@ -412,10 +426,18 @@ test('Firdaus Cup 2026 and Darwin Cup 2026 exist in seed with 148-player initial
 
   const darwinInitial = buildInitialRankings([], SEED_TOURNAMENTS[1]?.initialRankings);
   assert.equal(darwinInitial.length, 148);
+  assert.equal(darwinInitial[0]?.name, 'Godfrid Harry Mollyson Siregar');
+  assert.equal(darwinInitial[0]?.title, 'NM');
   assert.equal(darwinInitial[0]?.rating, 2243);
+  assert.equal(darwinInitial[1]?.name, 'Sahat Sitanggang');
+  assert.equal(darwinInitial[1]?.title, 'NM');
   assert.equal(darwinInitial[2]?.name, 'Yanurisman Candra');
   assert.equal(darwinInitial[2]?.rating, 2026);
   assert.equal(darwinInitial[2]?.clubCity, 'Kepri - Tanjung Pinang');
+  assert.equal(darwinInitial[3]?.name, 'Suhandri');
+  assert.equal(darwinInitial[3]?.title, 'MP');
+  assert.equal(darwinInitial[4]?.name, 'Nurdin Simanjuntak');
+  assert.equal(darwinInitial[4]?.title, 'NM');
   assert.equal(darwinInitial[5]?.name, 'Jonathan Charmian Vivaldy');
   assert.equal(darwinInitial[5]?.rating, 1896);
   assert.equal(darwinInitial[5]?.internationalRating, undefined);
@@ -836,5 +858,267 @@ test('calculateAthleteAge and formatAthleteBirthDisplay format dates, birth year
     calculateAthleteAge('2000-01-10', 2000)
   );
 });
+
+test('Kepri city options, athlete city filtering, and location formatting work across Kepri cities', () => {
+  assert.deepEqual(CITY_OPTIONS, [
+    'Anambas',
+    'Bintan',
+    'Karimun',
+    'Kota Batam',
+    'Lingga',
+    'Natuna',
+    'Tanjung Pinang',
+  ]);
+
+  const yanurisman = SEED_ATHLETES.find(
+    (a) => normalizeAthleteName(a.fullName) === 'yanurisman candra'
+  );
+  assert.ok(yanurisman);
+  assert.equal(getAthleteCity(yanurisman), 'Tanjung Pinang');
+  assert.equal(yanurisman.district, '-');
+  assert.equal(formatAthleteLocation(yanurisman), 'Tanjung Pinang');
+
+  const jumangat = SEED_ATHLETES.find(
+    (a) => normalizeAthleteName(a.fullName) === 'jumangat'
+  );
+  assert.ok(jumangat);
+  assert.equal(getAthleteCity(jumangat), 'Bintan');
+  assert.equal(jumangat.district, '-');
+
+  const syafrianto = SEED_ATHLETES.find(
+    (a) => normalizeAthleteName(a.fullName) === 'syafrianto'
+  );
+  assert.ok(syafrianto);
+  assert.equal(getAthleteCity(syafrianto), 'Lingga');
+  assert.equal(syafrianto.district, '-');
+
+  const godfrid = SEED_ATHLETES.find(
+    (a) => normalizeAthleteName(a.fullName) === 'godfrid harry mollyson siregar'
+  );
+  assert.ok(godfrid);
+  assert.equal(getAthleteCity(godfrid), 'Kota Batam');
+  assert.equal(godfrid.district, 'Sagulung');
+
+  const tpiList = filterAthletes(SEED_ATHLETES, { city: 'Tanjung Pinang' });
+  assert.equal(tpiList.length, 6);
+  assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'yanurisman candra'));
+  assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'bharata surya dharma'));
+  assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'yan vitra'));
+
+  const bintanList = filterAthletes(SEED_ATHLETES, { city: 'Bintan' });
+  assert.equal(bintanList.length, 4);
+
+  const linggaList = filterAthletes(SEED_ATHLETES, { city: 'Lingga' });
+  assert.equal(linggaList.length, 1);
+
+  const searchTpi = filterAthletes(SEED_ATHLETES, { query: 'tanjung pinang' });
+  assert.equal(searchTpi.length, 6);
+
+  const profileTpi = buildAthleteDetailProfile('Yanurisman Candra', SEED_ATHLETES, SEED_TOURNAMENTS);
+  assert.equal(profileTpi.city, 'Tanjung Pinang');
+});
+
+test('Master titles are preserved across tournament helpers and migratePortalData upgrades untitled cached rankings', () => {
+  assert.equal(
+    formatPlayerNameWithMasterTitle('Godfrid Harry Mollyson Siregar', SEED_ATHLETES),
+    'Godfrid Harry Mollyson Siregar, NM'
+  );
+  assert.equal(
+    formatPlayerNameWithMasterTitle('Suhandri, PM', SEED_ATHLETES),
+    'Suhandri, PM'
+  );
+  assert.equal(
+    formatPlayerNameWithMasterTitle('Suhandri', SEED_ATHLETES),
+    'Suhandri, MP'
+  );
+  assert.equal(
+    formatPlayerNameWithMasterTitle('Jon Toni', SEED_ATHLETES, 'Non-Gelar'),
+    'Jon Toni'
+  );
+  assert.equal(
+    formatPlayerNameWithMasterTitle('BYE', SEED_ATHLETES),
+    'BYE'
+  );
+  assert.equal(
+    resolvePlayerMasterTitle('Sahat Sitanggang', SEED_ATHLETES),
+    'NM'
+  );
+  assert.equal(
+    resolvePlayerMasterTitle('Pemain Baru', [], 'FM'),
+    'FM'
+  );
+
+  const untitledCached = {
+    ...SEED_PORTAL_DATA,
+    athletes: SEED_ATHLETES.map((a) => {
+      const copy = { ...a };
+      delete copy.city;
+      if (a.club === 'Kepri - Tanjung Pinang') {
+        return { ...copy, district: 'Batam Kota' as const };
+      }
+      return copy;
+    }),
+    tournaments: [
+      ...SEED_PORTAL_DATA.tournaments.map((t) => ({
+        ...t,
+        initialRankings: t.initialRankings?.map((row) => ({
+          ...row,
+          name: row.name.replace(/,\s*(NM|PM|MP)$/i, ''),
+          title: undefined,
+        })),
+      })),
+      {
+        ...SEED_PORTAL_DATA.tournaments[1]!,
+        id: 'trn-custom-open',
+        name: 'Kepri Open 2026',
+        initialRankings: [
+          { sNo: 1, name: 'Godfrid Harry Mollyson Siregar', rating: 2243, clubCity: 'Sagulung' },
+          { sNo: 2, name: 'Suhandri', rating: 1992, clubCity: 'KOCAK' },
+        ],
+      },
+    ],
+  };
+
+  const upgraded = migratePortalData(untitledCached);
+  const migratedYanurisman = upgraded.athletes.find(
+    (a) => normalizeAthleteName(a.fullName) === 'yanurisman candra'
+  );
+  assert.equal(migratedYanurisman?.city, 'Tanjung Pinang');
+  assert.equal(migratedYanurisman?.district, '-');
+
+  assert.equal(
+    upgraded.tournaments[0]?.initialRankings?.[0]?.name,
+    'Godfrid Harry Mollyson Siregar'
+  );
+  assert.equal(upgraded.tournaments[0]?.initialRankings?.[0]?.title, 'NM');
+  assert.equal(
+    upgraded.tournaments[1]?.initialRankings?.[3]?.name,
+    'Suhandri'
+  );
+  assert.equal(upgraded.tournaments[1]?.initialRankings?.[3]?.title, 'MP');
+  assert.equal(
+    upgraded.tournaments[2]?.initialRankings?.[0]?.name,
+    'Godfrid Harry Mollyson Siregar'
+  );
+  assert.equal(upgraded.tournaments[2]?.initialRankings?.[0]?.title, 'NM');
+  assert.equal(
+    upgraded.tournaments[2]?.initialRankings?.[1]?.name,
+    'Suhandri'
+  );
+  assert.equal(upgraded.tournaments[2]?.initialRankings?.[1]?.title, 'MP');
+});
+
+test('getPlayerDisplayParts puts masterTitle in front data without trailing comma title suffix', () => {
+  assert.deepEqual(
+    getPlayerDisplayParts('Godfrid Harry Mollyson Siregar, NM', SEED_ATHLETES),
+    { displayName: 'Godfrid Harry Mollyson Siregar', masterTitle: 'NM' }
+  );
+  assert.deepEqual(
+    getPlayerDisplayParts('Suhandri, PM', SEED_ATHLETES),
+    { displayName: 'Suhandri', masterTitle: 'MP' }
+  );
+  assert.deepEqual(
+    getPlayerDisplayParts('Sahat Sitanggang', SEED_ATHLETES),
+    { displayName: 'Sahat Sitanggang', masterTitle: 'NM' }
+  );
+  assert.deepEqual(
+    getPlayerDisplayParts('Yanurisman Candra', [
+      ...SEED_ATHLETES.filter((a) => normalizeAthleteName(a.fullName) !== 'yanurisman candra'),
+      {
+        ...SAMPLE_ATHLETES[0]!,
+        id: 'yan-edit',
+        fullName: 'Yanurisman Candra',
+        title: 'NM',
+      },
+    ]),
+    { displayName: 'Yanurisman Candra', masterTitle: 'NM' }
+  );
+  assert.deepEqual(
+    getPlayerDisplayParts('Jon Toni', SEED_ATHLETES, 'Non-Gelar'),
+    { displayName: 'Jon Toni', masterTitle: undefined }
+  );
+  assert.deepEqual(getPlayerDisplayParts('BYE', SEED_ATHLETES), {
+    displayName: 'BYE',
+  });
+});
+
+test('Every participant across all SEED_TOURNAMENTS exists in SEED_ATHLETES without duplicates, and syncAthletesFromTournaments adds only new participants', () => {
+  const seedNormalized = SEED_ATHLETES.map((a) => normalizeAthleteName(a.fullName));
+  const seedSet = new Set(seedNormalized);
+  assert.equal(
+    seedSet.size,
+    SEED_ATHLETES.length,
+    'SEED_ATHLETES must not contain normalized duplicate names'
+  );
+
+  SEED_TOURNAMENTS.forEach((trn) => {
+    (trn.initialRankings ?? []).forEach((row) => {
+      const key = normalizeAthleteName(row.name);
+      if (!key || key === 'bye') return;
+      assert.ok(seedSet.has(key), `Missing initialRankings player: ${row.name} (${trn.name})`);
+    });
+    (trn.standings ?? []).forEach((row) => {
+      const key = normalizeAthleteName(row.name);
+      if (!key || key === 'bye') return;
+      assert.ok(seedSet.has(key), `Missing standings player: ${row.name} (${trn.name})`);
+    });
+    (trn.pairings ?? []).forEach((p) => {
+      [p.whiteName, p.blackName].forEach((playerName) => {
+        const key = normalizeAthleteName(playerName);
+        if (!key || key === 'bye') return;
+        assert.ok(seedSet.has(key), `Missing pairing player: ${playerName} (${trn.name})`);
+      });
+    });
+  });
+
+  const tagor = SEED_ATHLETES.find(
+    (a) => normalizeAthleteName(a.fullName) === 'tagor tambunan'
+  );
+  assert.ok(tagor, 'Tagor Tambunan from Firdaus Cup 2026 initial rankings must exist in SEED_ATHLETES');
+  assert.equal(tagor.district, 'Sekupang');
+  assert.equal(tagor.federationStatus, 'Atlet');
+
+  const synced = syncAthletesFromTournaments(SEED_ATHLETES, [
+    {
+      ...SEED_TOURNAMENTS[1]!,
+      id: 'trn-kepri-baru-2026',
+      name: 'Kepri Baru Cup 2026',
+      initialRankings: [
+        { sNo: 1, name: 'Godfrid Harry Mollyson Siregar, NM', rating: 2243, clubCity: 'Sagulung' },
+        { sNo: 2, name: 'Budi Santoso Baru, FM', rating: 2110, gender: 'Putra', clubCity: 'Kepri - Karimun' },
+      ],
+      standings: [
+        { rank: 1, sNo: 1, title: 'MP', name: 'Suhandri, PM', club: 'KOCAK', points: 6, buchholz: 25, ratingChange: 0 },
+        { rank: 2, sNo: 3, title: 'Non-Gelar', name: 'Dewi Kartika Putri', club: 'Tanjung Pinang', category: 'Putri', points: 5, buchholz: 24, ratingChange: 0 },
+      ],
+      pairings: [
+        { round: 1, board: 1, whiteName: 'Budi Santoso Baru, FM', blackName: 'Riko Pratama Pair', result: '1 - 0' },
+        { round: 1, board: 2, whiteName: 'Dewi Kartika Putri', blackName: 'BYE', result: '1F - 0F' },
+      ],
+    },
+  ]);
+
+  assert.equal(synced.length, SEED_ATHLETES.length + 3);
+  const budi = synced.find((a) => normalizeAthleteName(a.fullName) === 'budi santoso baru');
+  assert.ok(budi);
+  assert.equal(budi.fullName, 'Budi Santoso Baru');
+  assert.equal(budi.title, 'FM');
+  assert.equal(budi.city, 'Karimun');
+  assert.equal(budi.federationStatus, 'Atlet');
+
+  const dewi = synced.find((a) => normalizeAthleteName(a.fullName) === 'dewi kartika putri');
+  assert.ok(dewi);
+  assert.equal(dewi.city, 'Tanjung Pinang');
+  assert.equal(dewi.category, 'Senior Putri');
+
+  const riko = synced.find((a) => normalizeAthleteName(a.fullName) === 'riko pratama pair');
+  assert.ok(riko);
+  assert.equal(
+    synced.some((a) => normalizeAthleteName(a.fullName) === 'bye'),
+    false
+  );
+});
+
+
 
 

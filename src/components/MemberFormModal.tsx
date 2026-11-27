@@ -4,13 +4,16 @@ import type {
   Athlete,
   AthleteCategory,
   BatamDistrict,
+  KepriCity,
   TitleCode,
 } from '../types/chess';
 import {
   CATEGORY_OPTIONS,
+  CITY_OPTIONS,
   DISTRICT_OPTIONS,
   TITLE_OPTIONS,
   calculateAthleteAge,
+  getAthleteCity,
 } from '../utils/portalLogic';
 import { compressImageToBase64 } from '../utils/storage';
 import { AthleteAvatar } from './AthleteAvatar';
@@ -35,7 +38,8 @@ export function MemberFormModal({
   const [birthDate, setBirthDate] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [club, setClub] = useState('');
-  const [district, setDistrict] = useState<BatamDistrict>('Batam Kota');
+  const [city, setCity] = useState<KepriCity>('Kota Batam');
+  const [district, setDistrict] = useState<BatamDistrict | '-'>('Batam Kota');
   const [standard, setStandard] = useState('1600');
   const [rapid, setRapid] = useState('1600');
   const [blitz, setBlitz] = useState('1600');
@@ -47,6 +51,7 @@ export function MemberFormModal({
   useEffect(() => {
     if (!isOpen) return;
     if (editingAthlete) {
+      const resolvedCity = getAthleteCity(editingAthlete);
       setFullName(editingAthlete.fullName);
       setTitle(editingAthlete.title);
       setCategory(editingAthlete.category);
@@ -54,7 +59,14 @@ export function MemberFormModal({
       setBirthDate(editingAthlete.birthDate ?? '');
       setBirthYear(editingAthlete.birthYear ? String(editingAthlete.birthYear) : '');
       setClub(editingAthlete.club);
-      setDistrict(editingAthlete.district);
+      setCity(resolvedCity);
+      setDistrict(
+        resolvedCity === 'Kota Batam'
+          ? editingAthlete.district === '-'
+            ? 'Batam Kota'
+            : editingAthlete.district
+          : '-'
+      );
       setStandard(String(editingAthlete.ratings.standard));
       setRapid(String(editingAthlete.ratings.rapid));
       setBlitz(String(editingAthlete.ratings.blitz));
@@ -68,6 +80,7 @@ export function MemberFormModal({
       setBirthDate('');
       setBirthYear('2001');
       setClub('Semanggi Chess Club');
+      setCity('Kota Batam');
       setDistrict('Batam Kota');
       setStandard('1650');
       setRapid('1650');
@@ -150,6 +163,13 @@ export function MemberFormModal({
       return;
     }
 
+    const normalizedDistrict: BatamDistrict | '-' =
+      city === 'Kota Batam'
+        ? district === '-'
+          ? 'Batam Kota'
+          : district
+        : '-';
+
     const payload: Athlete = {
       id: editingAthlete?.id ?? `ath-${Date.now()}`,
       fullName: trimmedName,
@@ -159,7 +179,8 @@ export function MemberFormModal({
       ...(trimmedBirthDate ? { birthDate: trimmedBirthDate } : {}),
       ...(parsedBirth !== undefined ? { birthYear: parsedBirth } : {}),
       club: trimmedClub,
-      district,
+      city,
+      district: normalizedDistrict,
       photoUrl,
       ratings: {
         standard: parsedStd,
@@ -168,7 +189,9 @@ export function MemberFormModal({
       },
       bio:
         bio.trim() ||
-        `Atlet catur terdaftar Pengkot PERCASI Kota Batam wilayah ${district}.`,
+        (city === 'Kota Batam'
+          ? `Atlet catur terdaftar Pengkot PERCASI Kota Batam wilayah ${normalizedDistrict}.`
+          : `Atlet catur asal ${city} terdaftar Pengprov PERCASI Kepulauan Riau.`),
       federationStatus: 'Atlet',
       tournamentHistory: editingAthlete?.tournamentHistory ?? [],
     };
@@ -399,20 +422,31 @@ export function MemberFormModal({
 
             <div>
               <label
-                htmlFor="member-club"
+                htmlFor="member-city"
                 className="mb-1 block text-xs font-semibold text-slate-700"
               >
-                Klub Catur *
+                Asal Kota / Kabupaten *
               </label>
-              <input
-                id="member-club"
-                type="text"
-                required
-                value={club}
-                onChange={(e) => setClub(e.target.value)}
-                placeholder="Contoh: Semanggi Chess Club"
-                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#0F2342] focus:outline-none"
-              />
+              <select
+                id="member-city"
+                value={city}
+                onChange={(e) => {
+                  const nextCity = e.target.value as KepriCity;
+                  setCity(nextCity);
+                  if (nextCity === 'Kota Batam' && district === '-') {
+                    setDistrict('Batam Kota');
+                  } else if (nextCity !== 'Kota Batam') {
+                    setDistrict('-');
+                  }
+                }}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-[#0F2342] focus:outline-none"
+              >
+                {CITY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -424,16 +458,36 @@ export function MemberFormModal({
               </label>
               <select
                 id="member-district"
-                value={district}
-                onChange={(e) => setDistrict(e.target.value as BatamDistrict)}
-                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-[#0F2342] focus:outline-none"
+                disabled={city !== 'Kota Batam'}
+                value={city === 'Kota Batam' ? district : '-'}
+                onChange={(e) => setDistrict(e.target.value as BatamDistrict | '-')}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-[#0F2342] focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
               >
+                {city !== 'Kota Batam' && <option value="-">-</option>}
                 {DISTRICT_OPTIONS.map((d) => (
                   <option key={d} value={d}>
                     {d}
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="member-club"
+                className="mb-1 block text-xs font-semibold text-slate-700"
+              >
+                Klub Catur *
+              </label>
+              <input
+                id="member-club"
+                type="text"
+                required
+                value={club}
+                onChange={(e) => setClub(e.target.value)}
+                placeholder="Contoh: Semanggi Chess Club atau - jika perorangan"
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#0F2342] focus:outline-none"
+              />
             </div>
           </div>
 

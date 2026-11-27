@@ -8,7 +8,7 @@ import type {
   RatingCategory,
   Tournament,
 } from '../types/chess';
-import { getTopAthletes } from '../utils/portalLogic';
+import { getAthleteCity, getTopAthletes } from '../utils/portalLogic';
 import { AthleteAvatar } from './AthleteAvatar';
 import { TitleBadge, TournamentStatusText } from './TitleBadge';
 
@@ -61,7 +61,7 @@ export function HomeView({
     if (!q) return null;
     const matchedAthletes = athletes
       .filter((a) =>
-        [a.fullName, a.club, a.district]
+        [a.fullName, a.club, getAthleteCity(a), a.district !== '-' ? a.district : '']
           .join(' ')
           .toLowerCase()
           .includes(q)
@@ -213,7 +213,7 @@ export function HomeView({
                                     {ath.fullName}
                                   </span>
                                   <span className="text-xs text-slate-500">
-                                    {ath.district}
+                                    {ath.district !== '-' ? ath.district : getAthleteCity(ath)}
                                   </span>
                                 </div>
                                 <span className="font-mono-tabular text-xs font-bold text-[#0F2342]">
@@ -471,7 +471,10 @@ export function HomeView({
                           </span>
                         </div>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
-                          {athlete.club} · {athlete.district}
+                          {athlete.club} ·{' '}
+                          {athlete.district !== '-'
+                            ? athlete.district
+                            : getAthleteCity(athlete)}
                         </p>
                       </div>
                     </div>
@@ -591,7 +594,10 @@ export function HomeView({
                           </span>
                         </div>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
-                          {athlete.club} · {athlete.district}
+                          {athlete.club} ·{' '}
+                          {athlete.district !== '-'
+                            ? athlete.district
+                            : getAthleteCity(athlete)}
                         </p>
                       </div>
                     </div>

@@ -1,7 +1,11 @@
 import { Edit3, MapPin, Trophy, X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { Athlete } from '../types/chess';
-import { formatRatingDelta } from '../utils/portalLogic';
+import {
+  formatAthleteLocation,
+  formatRatingDelta,
+  getAthleteCity,
+} from '../utils/portalLogic';
 import { AthleteAvatar } from './AthleteAvatar';
 import { TitleBadge } from './TitleBadge';
 
@@ -29,6 +33,8 @@ export function AthleteProfileModal({
 
   if (!athlete) return null;
 
+  const athleteCity = getAthleteCity(athlete);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs"
@@ -43,7 +49,7 @@ export function AthleteProfileModal({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <span className="font-mono-tabular text-xs font-semibold text-slate-500">
-            Kartu Profil Atlet · PERCASI Kota Batam
+            Kartu Profil Atlet · PERCASI Kepulauan Riau
           </span>
           <div className="flex items-center gap-2">
             {isAdminMode && (
@@ -103,8 +109,15 @@ export function AthleteProfileModal({
                 <p className="flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
                   <span>
-                    {athlete.club} · Kecamatan {athlete.district}, Kota Batam
+                    {formatAthleteLocation({
+                      club: athlete.club,
+                      city: athleteCity,
+                      district: athlete.district,
+                    })}
                   </span>
+                </p>
+                <p>
+                  Asal Kota: <strong className="text-slate-900">{athleteCity}</strong>
                 </p>
                 {athlete.birthYear && (
                   <p className="font-mono-tabular">

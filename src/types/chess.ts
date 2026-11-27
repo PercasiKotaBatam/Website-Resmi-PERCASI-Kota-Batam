@@ -36,6 +36,15 @@ export type BatamDistrict =
   | 'Sungai Beduk'
   | 'Sagulung';
 
+export type KepriCity =
+  | 'Anambas'
+  | 'Bintan'
+  | 'Karimun'
+  | 'Kota Batam'
+  | 'Lingga'
+  | 'Natuna'
+  | 'Tanjung Pinang';
+
 export type RatingCategory = 'standard' | 'rapid' | 'blitz';
 
 export interface AthleteTournamentRecord {
@@ -57,7 +66,8 @@ export interface Athlete {
   birthDate?: string;
   birthYear?: number;
   club: string;
-  district: BatamDistrict;
+  city?: KepriCity;
+  district: BatamDistrict | '-';
   photoUrl?: string;
   ratings: {
     standard: number;

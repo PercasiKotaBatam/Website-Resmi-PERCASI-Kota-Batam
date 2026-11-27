@@ -1,11 +1,15 @@
 import { ArrowRight, Calendar, FileSpreadsheet, MapPin, Pencil, Search, UserCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { Tournament, TournamentStatus } from '../types/chess';
-import { filterTournaments } from '../utils/portalLogic';
+import type { Athlete, Tournament, TournamentStatus } from '../types/chess';
+import {
+  filterTournaments,
+  getPlayerDisplayParts,
+} from '../utils/portalLogic';
 import { TitleBadge, TournamentStatusText } from './TitleBadge';
 
 interface TournamentsViewProps {
   tournaments: Tournament[];
+  athletes?: Athlete[];
   isAdminMode: boolean;
   onSelectTournament: (tournament: Tournament) => void;
   onSelectAthlete: (athleteName: string) => void;
@@ -22,6 +26,7 @@ const STATUS_FILTERS: (TournamentStatus | 'Semua')[] = [
 
 export function TournamentsView({
   tournaments,
+  athletes = [],
   isAdminMode,
   onSelectTournament,
   onSelectAthlete,
@@ -196,34 +201,49 @@ export function TournamentsView({
 
                       {topThree.length > 0 ? (
                         <div className="mt-3 divide-y divide-slate-200">
-                          {topThree.map((entry) => (
-                            <div
-                              key={`${trn.id}-${entry.rank}-${entry.name}`}
-                              className="flex items-center justify-between gap-2 py-2 text-xs"
-                            >
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span className="font-mono-tabular w-5 font-bold text-slate-500">
-                                  #{entry.rank}
+                          {topThree.map((entry) => {
+                            const { displayName, masterTitle } =
+                              getPlayerDisplayParts(
+                                entry.name,
+                                athletes,
+                                entry.title
+                              );
+                            const badgeTitle = masterTitle ?? entry.title;
+                            return (
+                              <div
+                                key={`${trn.id}-${entry.rank}-${entry.name}`}
+                                className="flex items-center justify-between gap-2 py-2 text-xs"
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="font-mono-tabular w-5 font-bold text-slate-500">
+                                    #{entry.rank}
+                                  </span>
+                                  <TitleBadge title={badgeTitle} />
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectAthlete(entry.name)}
+                                    className="truncate text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                                  >
+                                    {displayName}
+                                  </button>
+                                </div>
+                                <span className="font-mono-tabular font-bold text-[#0F2342] shrink-0">
+                                  {entry.points.toFixed(1)} pts
                                 </span>
-                                <TitleBadge title={entry.title} />
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectAthlete(entry.name)}
-                                  className="truncate text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
-                                >
-                                  {entry.name}
-                                </button>
                               </div>
-                              <span className="font-mono-tabular font-bold text-[#0F2342] shrink-0">
-                                {entry.points.toFixed(1)} pts
-                              </span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (trn.initialRankings?.length ?? 0) > 0 ? (
                         <div className="mt-3 divide-y divide-slate-200">
                           {(trn.initialRankings ?? []).slice(0, 3).map((entry) => {
                             const rtg = entry.rating ?? entry.nationalRating;
+                            const { displayName, masterTitle } =
+                              getPlayerDisplayParts(
+                                entry.name,
+                                athletes,
+                                entry.title
+                              );
                             return (
                               <div
                                 key={`${trn.id}-seed-${entry.sNo}-${entry.name}`}
@@ -233,12 +253,13 @@ export function TournamentsView({
                                   <span className="font-mono-tabular w-5 font-bold text-slate-500">
                                     #{entry.sNo}
                                   </span>
+                                  {masterTitle && <TitleBadge title={masterTitle} />}
                                   <button
                                     type="button"
                                     onClick={() => onSelectAthlete(entry.name)}
                                     className="truncate text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
                                   >
-                                    {entry.name}
+                                    {displayName}
                                   </button>
                                 </div>
                                 <span className="font-mono-tabular font-bold text-[#0F2342] shrink-0">

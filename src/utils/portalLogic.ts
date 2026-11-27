@@ -4,6 +4,7 @@ import type {
   AthleteCategory,
   BatamDistrict,
   InitialRankEntry,
+  KepriCity,
   PortalData,
   RatingCategory,
   RoundPairing,
@@ -16,6 +17,7 @@ export interface AthleteFilterOptions {
   query?: string;
   title?: TitleCode | 'Semua';
   category?: AthleteCategory | 'Semua';
+  city?: KepriCity | 'Semua';
   district?: BatamDistrict | 'Semua';
 }
 
@@ -44,6 +46,16 @@ export const CATEGORY_OPTIONS: AthleteCategory[] = [
   'Veteran',
 ];
 
+export const CITY_OPTIONS: KepriCity[] = [
+  'Anambas',
+  'Bintan',
+  'Karimun',
+  'Kota Batam',
+  'Lingga',
+  'Natuna',
+  'Tanjung Pinang',
+];
+
 export const DISTRICT_OPTIONS: BatamDistrict[] = [
   'Batam Kota',
   'Sekupang',
@@ -55,6 +67,110 @@ export const DISTRICT_OPTIONS: BatamDistrict[] = [
   'Sagulung',
 ];
 
+export function inferAthleteCity(rawValue?: string): KepriCity {
+  const lower = (rawValue ?? '').trim().toLowerCase();
+  if (!lower) return 'Kota Batam';
+  if (lower.includes('tanjung pinang') || lower.includes('tanjungpinang')) {
+    return 'Tanjung Pinang';
+  }
+  if (lower.includes('anambas')) return 'Anambas';
+  if (lower.includes('bintan')) return 'Bintan';
+  if (lower.includes('karimun')) return 'Karimun';
+  if (lower.includes('lingga')) return 'Lingga';
+  if (lower.includes('natuna')) return 'Natuna';
+  return 'Kota Batam';
+}
+
+export function mapClubCityToAthleteLocation(rawClubCity?: string): {
+  city: KepriCity;
+  district: Athlete['district'];
+  club: string;
+} {
+  const raw = (rawClubCity ?? '').trim();
+  const lower = raw.toLowerCase();
+  if (lower.includes('tanjung pinang') || lower.includes('tanjungpinang')) {
+    return { city: 'Tanjung Pinang', district: '-', club: '-' };
+  }
+  if (lower.includes('bintan')) {
+    return { city: 'Bintan', district: '-', club: '-' };
+  }
+  if (lower.includes('lingga')) {
+    return { city: 'Lingga', district: '-', club: '-' };
+  }
+  if (lower.includes('karimun')) {
+    return { city: 'Karimun', district: '-', club: '-' };
+  }
+  if (lower.includes('natuna')) {
+    return { city: 'Natuna', district: '-', club: '-' };
+  }
+  if (lower.includes('anambas')) {
+    return { city: 'Anambas', district: '-', club: '-' };
+  }
+  if (lower === 'sagulung' || lower === 'kec. sagulung') {
+    return { city: 'Kota Batam', district: 'Sagulung', club: '-' };
+  }
+  if (lower === 'sekupang' || lower === 'kec. sekupang') {
+    return { city: 'Kota Batam', district: 'Sekupang', club: '-' };
+  }
+  if (lower === 'batu aji' || lower === 'kec. batu aji') {
+    return { city: 'Kota Batam', district: 'Batu Aji', club: '-' };
+  }
+  if (lower === 'lubuk baja' || lower === 'kec. lubuk baja') {
+    return { city: 'Kota Batam', district: 'Lubuk Baja', club: '-' };
+  }
+  if (lower === 'batam kota' || lower === 'kec. batam kota') {
+    return { city: 'Kota Batam', district: 'Batam Kota', club: '-' };
+  }
+  if (
+    lower === 'sei beduk' ||
+    lower === 'sungai beduk' ||
+    lower === 'kec. sungai beduk' ||
+    lower === 'kec. sei beduk'
+  ) {
+    return { city: 'Kota Batam', district: 'Sungai Beduk', club: '-' };
+  }
+  if (lower === 'bengkong' || lower === 'kec. bengkong') {
+    return { city: 'Kota Batam', district: 'Bengkong', club: '-' };
+  }
+  if (lower === 'nongsa' || lower === 'kec. nongsa') {
+    return { city: 'Kota Batam', district: 'Nongsa', club: '-' };
+  }
+  if (lower === 'junior' || lower === 'batu ampar' || !raw || raw === '-') {
+    return { city: 'Kota Batam', district: 'Batam Kota', club: '-' };
+  }
+  return { city: 'Kota Batam', district: 'Batam Kota', club: raw };
+}
+
+export function getAthleteCity(
+  athlete: Pick<Athlete, 'city' | 'club'>
+): KepriCity {
+  if (athlete.city && CITY_OPTIONS.includes(athlete.city)) {
+    return athlete.city;
+  }
+  return inferAthleteCity(athlete.club);
+}
+
+export function formatAthleteLocation(athlete: {
+  club?: string;
+  city?: string;
+  district?: string;
+}): string {
+  const city = athlete.city || 'Kota Batam';
+  const parts: string[] = [];
+  if (athlete.club && athlete.club !== '-') {
+    parts.push(athlete.club);
+  }
+  if (
+    city === 'Kota Batam' &&
+    athlete.district &&
+    athlete.district !== '-'
+  ) {
+    parts.push(`Kec. ${athlete.district}`);
+  }
+  parts.push(city);
+  return parts.join(' · ');
+}
+
 export function filterAthletes(
   athletes: Athlete[],
   options: AthleteFilterOptions
@@ -62,6 +178,7 @@ export function filterAthletes(
   const normalizedQuery = (options.query ?? '').trim().toLowerCase();
 
   return athletes.filter((athlete) => {
+    const city = getAthleteCity(athlete);
     if (options.title && options.title !== 'Semua' && athlete.title !== options.title) {
       return false;
     }
@@ -70,6 +187,9 @@ export function filterAthletes(
       options.category !== 'Semua' &&
       athlete.category !== options.category
     ) {
+      return false;
+    }
+    if (options.city && options.city !== 'Semua' && city !== options.city) {
       return false;
     }
     if (
@@ -83,7 +203,8 @@ export function filterAthletes(
       const searchable = [
         athlete.fullName,
         athlete.club,
-        athlete.district,
+        city,
+        athlete.district !== '-' ? athlete.district : '',
         athlete.title,
       ]
         .join(' ')
@@ -1213,6 +1334,7 @@ export interface AthleteDetailProfile {
   fed?: string;
   category: string;
   club: string;
+  city?: string;
   district?: string;
   birthDate?: string;
   birthYear?: number;
@@ -1234,7 +1356,25 @@ export interface AthleteDetailProfile {
 
 const ATHLETE_NAME_ALIASES: Record<string, string> = {
   'isma yudi': 'ismail yudi',
+  'bharata dharma surya': 'bharata surya dharma',
+  'yan fitra': 'yan vitra',
 };
+
+export const MASTER_PLAYER_TITLE_CODES = new Set([
+  'GM',
+  'IM',
+  'FM',
+  'WFM',
+  'WIM',
+  'WGM',
+  'NM',
+  'MP',
+  'PM',
+  'AGM',
+  'AIM',
+  'AFM',
+  'ACM',
+]);
 
 export function normalizeAthleteName(name: string): string {
   const withoutTitle = name
@@ -1265,6 +1405,200 @@ function extractTitleSuffix(name: string): string | undefined {
   if (!match) return undefined;
   const code = match[1].toUpperCase();
   return code === 'PM' ? 'MP' : code;
+}
+
+function normalizeMasterTitleCode(rawTitle?: string): string | undefined {
+  if (!rawTitle) return undefined;
+  const upper = rawTitle.trim().toUpperCase();
+  if (!MASTER_PLAYER_TITLE_CODES.has(upper)) return undefined;
+  return upper === 'PM' ? 'MP' : upper;
+}
+
+export function resolvePlayerMasterTitle(
+  rawName: string,
+  athletes: Athlete[],
+  explicitTitle?: string
+): string | undefined {
+  const suffixTitle = extractTitleSuffix(rawName);
+  if (suffixTitle && MASTER_PLAYER_TITLE_CODES.has(suffixTitle)) {
+    return suffixTitle;
+  }
+  const normalizedExplicit = normalizeMasterTitleCode(explicitTitle);
+  if (normalizedExplicit) {
+    return normalizedExplicit;
+  }
+  const key = normalizeAthleteName(rawName);
+  if (!key) return undefined;
+  const matched = athletes.find((a) => normalizeAthleteName(a.fullName) === key);
+  return matched ? normalizeMasterTitleCode(matched.title) : undefined;
+}
+
+export function getPlayerDisplayParts(
+  rawName: string,
+  athletes: Athlete[],
+  explicitTitle?: string
+): { displayName: string; masterTitle?: string } {
+  const trimmed = rawName.trim();
+  if (!trimmed) return { displayName: '' };
+  if (trimmed.toUpperCase() === 'BYE') return { displayName: 'BYE' };
+  const masterTitle = resolvePlayerMasterTitle(trimmed, athletes, explicitTitle);
+  const displayName = stripTitleSuffix(trimmed);
+  return {
+    displayName: displayName || trimmed,
+    masterTitle,
+  };
+}
+
+export function formatPlayerNameWithMasterTitle(
+  rawName: string,
+  athletes: Athlete[],
+  explicitTitle?: string
+): string {
+  const trimmed = rawName.trim();
+  if (!trimmed) return '';
+  if (trimmed.toUpperCase() === 'BYE') return trimmed;
+
+  const existingSuffix = extractTitleSuffix(trimmed);
+  if (existingSuffix && MASTER_PLAYER_TITLE_CODES.has(existingSuffix)) {
+    return trimmed;
+  }
+
+  const resolvedTitle = resolvePlayerMasterTitle(trimmed, athletes, explicitTitle);
+  if (!resolvedTitle) {
+    return trimmed;
+  }
+  return `${trimmed}, ${resolvedTitle}`;
+}
+
+export function syncAthletesFromTournaments(
+  athletes: Athlete[],
+  tournaments: Tournament[]
+): Athlete[] {
+  const seenKeys = new Set<string>(
+    athletes.map((a) => normalizeAthleteName(a.fullName)).filter(Boolean)
+  );
+  const usedIds = new Set<string>(athletes.map((a) => a.id));
+  const additions: Athlete[] = [];
+
+  const nextUniqueId = (baseSlug: string): string => {
+    let candidate = baseSlug;
+    let counter = 2;
+    while (usedIds.has(candidate)) {
+      candidate = `${baseSlug}-${counter}`;
+      counter += 1;
+    }
+    usedIds.add(candidate);
+    return candidate;
+  };
+
+  const toTitleCode = (rawName: string, explicitTitle?: string): TitleCode => {
+    const master = resolvePlayerMasterTitle(rawName, [], explicitTitle);
+    if (master && TITLE_OPTIONS.includes(master as TitleCode)) {
+      return master as TitleCode;
+    }
+    return 'Non-Gelar';
+  };
+
+  tournaments.forEach((tournament, tIdx) => {
+    const trnTag = (tournament.id || `t${tIdx + 1}`)
+      .replace(/^trn-/, '')
+      .replace(/[^a-z0-9]+/gi, '-')
+      .toLowerCase()
+      .slice(0, 14);
+
+    const registerCandidate = (params: {
+      rawName: string;
+      explicitTitle?: string;
+      genderRaw?: string;
+      categoryRaw?: string;
+      clubCityRaw?: string;
+      ratingVal?: number | string;
+      seqHint: string;
+    }) => {
+      const cleanDisplayName = stripTitleSuffix(params.rawName);
+      const key = normalizeAthleteName(cleanDisplayName);
+      if (!key || key === 'bye') return;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+
+      const { city, district, club } = mapClubCityToAthleteLocation(
+        params.clubCityRaw
+      );
+      const genderLower = (params.genderRaw ?? '').trim().toLowerCase();
+      const catLower = (params.categoryRaw ?? '').trim().toLowerCase();
+      const clubCityLower = (params.clubCityRaw ?? '').trim().toLowerCase();
+      const isPutri = genderLower === 'putri' || catLower === 'putri' || catLower.includes('putri');
+      const isJunior = catLower.includes('junior') || clubCityLower === 'junior';
+
+      const category: AthleteCategory = isPutri
+        ? 'Senior Putri'
+        : isJunior
+          ? 'Junior U-18'
+          : 'Senior Putra';
+      const numericRating = parseInitialRankNumericRating(params.ratingVal);
+
+      additions.push({
+        id: nextUniqueId(`ath-${trnTag}-${params.seqHint}`),
+        fullName: cleanDisplayName,
+        title: toTitleCode(params.rawName, params.explicitTitle),
+        category,
+        gender: isPutri ? 'Putri' : 'Putra',
+        club,
+        city,
+        district,
+        ratings: {
+          standard: numericRating,
+          rapid: numericRating,
+          blitz: numericRating,
+        },
+        bio:
+          city === 'Kota Batam'
+            ? `Atlet catur terdaftar Pengkot PERCASI Kota Batam (Peserta ${tournament.name}).`
+            : `Atlet catur asal ${city} terdaftar Pengprov PERCASI Kepulauan Riau (Peserta ${tournament.name}).`,
+        federationStatus: 'Atlet',
+        tournamentHistory: [],
+      });
+    };
+
+    (tournament.initialRankings ?? []).forEach((entry, idx) => {
+      registerCandidate({
+        rawName: entry.name,
+        explicitTitle: entry.title,
+        genderRaw: entry.gender,
+        categoryRaw: entry.category,
+        clubCityRaw: entry.clubCity ?? entry.club,
+        ratingVal: entry.rating ?? entry.nationalRating,
+        seqHint: `ir-${String(entry.sNo ?? idx + 1).padStart(3, '0')}`,
+      });
+    });
+
+    (tournament.standings ?? []).forEach((entry, idx) => {
+      registerCandidate({
+        rawName: entry.name,
+        explicitTitle: entry.title,
+        categoryRaw: entry.category,
+        clubCityRaw: entry.club,
+        ratingVal: entry.rating,
+        seqHint: `st-${String(entry.sNo ?? entry.rank ?? idx + 1).padStart(3, '0')}`,
+      });
+    });
+
+    (tournament.pairings ?? []).forEach((pairing, idx) => {
+      registerCandidate({
+        rawName: pairing.whiteName,
+        explicitTitle: pairing.whiteTitle,
+        seqHint: `p${pairing.round}-${pairing.board}w-${idx + 1}`,
+      });
+      registerCandidate({
+        rawName: pairing.blackName,
+        explicitTitle: pairing.blackTitle,
+        seqHint: `p${pairing.round}-${pairing.board}b-${idx + 1}`,
+      });
+    });
+  });
+
+  if (additions.length === 0) return athletes;
+  return [...athletes, ...additions];
 }
 
 export function evaluatePairingOutcome(
@@ -1333,6 +1667,7 @@ export function buildAthleteDetailProfile(
 
   const standingsRecords: AthleteTournamentStandingSummary[] = [];
   let matchedStanding: StandingEntry | undefined;
+  let matchedInitial: InitialRankEntry | undefined;
   let fallbackDisplayName = registeredAthlete?.fullName ?? stripTitleSuffix(identifier);
   let fallbackTitle = registeredAthlete?.title ?? extractTitleSuffix(identifier) ?? 'Non-Gelar';
 
@@ -1346,6 +1681,21 @@ export function buildAthleteDetailProfile(
   let ongoingGames = 0;
 
   tournaments.forEach((tournament) => {
+    if (!matchedInitial && Array.isArray(tournament.initialRankings)) {
+      const initMatch = tournament.initialRankings.find(
+        (ir) => normalizeAthleteName(ir.name) === targetKey
+      );
+      if (initMatch) {
+        matchedInitial = initMatch;
+        if (fallbackTitle === 'Non-Gelar') {
+          const fromInitTitle = normalizeMasterTitleCode(
+            initMatch.title ?? extractTitleSuffix(initMatch.name)
+          );
+          if (fromInitTitle) fallbackTitle = fromInitTitle;
+        }
+      }
+    }
+
     const standing = tournament.standings.find(
       (s) => normalizeAthleteName(s.name) === targetKey
     );
@@ -1445,11 +1795,19 @@ export function buildAthleteDetailProfile(
     whiteLosses + blackLosses
   );
 
+  const resolvedCity = registeredAthlete
+    ? getAthleteCity(registeredAthlete)
+    : matchedInitial?.clubCity
+      ? inferAthleteCity(matchedInitial.clubCity)
+      : matchedStanding?.club
+        ? inferAthleteCity(matchedStanding.club)
+        : 'Kota Batam';
+
   return {
     key: targetKey,
     fullName: registeredAthlete?.fullName ?? fallbackDisplayName,
     title: fallbackTitle,
-    fed: matchedStanding?.fed ?? (registeredAthlete ? 'INA' : undefined),
+    fed: matchedStanding?.fed ?? matchedInitial?.fed ?? (registeredAthlete ? 'INA' : undefined),
     category:
       registeredAthlete?.category ??
       matchedStanding?.category ??
@@ -1458,8 +1816,12 @@ export function buildAthleteDetailProfile(
       registeredAthlete?.club ??
       (matchedStanding?.club && matchedStanding.club !== '-'
         ? matchedStanding.club
-        : 'Peserta Turnamen PERCASI Batam'),
-    district: registeredAthlete?.district,
+        : 'Peserta Turnamen PERCASI Kepulauan Riau'),
+    city: resolvedCity,
+    district:
+      registeredAthlete?.district && registeredAthlete.district !== '-'
+        ? registeredAthlete.district
+        : undefined,
     birthDate: registeredAthlete?.birthDate,
     birthYear: registeredAthlete?.birthYear,
     age: calculateAthleteAge(
@@ -1470,10 +1832,13 @@ export function buildAthleteDetailProfile(
     federationStatus: registeredAthlete?.federationStatus,
     bio:
       registeredAthlete?.bio ||
-      'Peserta turnamen resmi yang tercatat dalam arsip pertandingan Pengkot PERCASI Kota Batam.',
+      `Peserta turnamen resmi asal ${resolvedCity} yang tercatat dalam arsip pertandingan PERCASI.`,
     ratings: registeredAthlete?.ratings,
-    tournamentRating: matchedStanding?.rating,
-    seedNumber: matchedStanding?.sNo,
+    tournamentRating:
+      matchedStanding?.rating ??
+      matchedInitial?.rating ??
+      matchedInitial?.nationalRating,
+    seedNumber: matchedStanding?.sNo ?? matchedInitial?.sNo,
     registeredAthlete,
     totalStats,
     whiteStats,

@@ -23,7 +23,10 @@ import type {
   PortalData,
   Tournament,
 } from './types/chess';
-import { pickAuthoritativePortalData } from './utils/portalLogic';
+import {
+  pickAuthoritativePortalData,
+  syncAthletesFromTournaments,
+} from './utils/portalLogic';
 import { isStaticAdminToken } from './utils/staticAdminAuth';
 import {
   fetchPublishedPortalData,
@@ -231,11 +234,13 @@ export default function App() {
   };
 
   const handleSaveTournament = (tournament: Tournament, isEdit: boolean) => {
+    const nextTournaments = isEdit
+      ? portalData.tournaments.map((t) => (t.id === tournament.id ? tournament : t))
+      : [tournament, ...portalData.tournaments];
     const nextData: PortalData = {
       ...portalData,
-      tournaments: isEdit
-        ? portalData.tournaments.map((t) => (t.id === tournament.id ? tournament : t))
-        : [tournament, ...portalData.tournaments],
+      athletes: syncAthletesFromTournaments(portalData.athletes, nextTournaments),
+      tournaments: nextTournaments,
     };
     commitPortalChange(nextData);
     setSelectedAthleteTarget(null);
@@ -246,11 +251,13 @@ export default function App() {
   };
 
   const handleUpdateTournamentInPlace = (tournament: Tournament) => {
+    const nextTournaments = portalData.tournaments.map((t) =>
+      t.id === tournament.id ? tournament : t
+    );
     const nextData: PortalData = {
       ...portalData,
-      tournaments: portalData.tournaments.map((t) =>
-        t.id === tournament.id ? tournament : t
-      ),
+      athletes: syncAthletesFromTournaments(portalData.athletes, nextTournaments),
+      tournaments: nextTournaments,
     };
     commitPortalChange(nextData);
     setSelectedTournament(tournament);
@@ -351,6 +358,7 @@ export default function App() {
             {activeSection === 'turnamen' && (
               <TournamentsView
                 tournaments={portalData.tournaments}
+                athletes={portalData.athletes}
                 isAdminMode={isAdminMode}
                 onSelectTournament={setSelectedTournament}
                 onSelectAthlete={(name) => handleOpenAthletePage(name)}
@@ -375,6 +383,7 @@ export default function App() {
 
       <TournamentDetailModal
         tournament={selectedTournament}
+        athletes={portalData.athletes}
         isAdminMode={isAdminMode}
         onClose={() => setSelectedTournament(null)}
         onSelectAthlete={(name, tournamentId) =>

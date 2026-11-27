@@ -4,6 +4,7 @@ import type { Athlete, AthleteCategory, RatingCategory } from '../types/chess';
 import {
   CATEGORY_OPTIONS,
   filterAthletes,
+  getAthleteCity,
   sortRatings,
   type RatingSortField,
   type SortDirection,
@@ -220,7 +221,11 @@ export function LeaderboardView({
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">
                       <p className="font-medium text-slate-800">{athlete.club}</p>
-                      <p className="text-slate-500">{athlete.district}</p>
+                      <p className="text-slate-500">
+                        {athlete.district !== '-'
+                          ? `${athlete.district} · ${getAthleteCity(athlete)}`
+                          : getAthleteCity(athlete)}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
                       {athlete.category}

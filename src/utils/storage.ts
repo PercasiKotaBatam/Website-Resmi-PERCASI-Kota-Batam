@@ -13,11 +13,16 @@ import {
   SEED_PORTAL_DATA,
   SEED_TOURNAMENTS,
 } from '../data/seedData';
-import type { Athlete, PortalData } from '../types/chess';
+import type { Athlete, InitialRankEntry, PortalData } from '../types/chess';
 import {
+  CITY_OPTIONS,
+  inferAthleteCity,
   normalizeAthleteName,
   pickAuthoritativePortalData,
+  resolvePlayerMasterTitle,
   resolvePublicAssetUrl,
+  stripTitleSuffix,
+  syncAthletesFromTournaments,
   validatePortalBackup,
 } from './portalLogic';
 
@@ -51,16 +56,60 @@ const REMOVED_NEWS_IDS = new Set([
   'news-04',
 ]);
 
+const SEED_ATHLETE_BY_NAME = new Map<string, Athlete>(
+  SEED_ATHLETES.map((a) => [normalizeAthleteName(a.fullName), a])
+);
+
+function enrichInitialRankingsMasterTitles(
+  entries: InitialRankEntry[],
+  athletes: Athlete[]
+): InitialRankEntry[] {
+  return entries.map((row) => {
+    const resolved = resolvePlayerMasterTitle(row.name, athletes, row.title);
+    const cleanName = stripTitleSuffix(row.name);
+    if (!resolved) {
+      return cleanName !== row.name ? { ...row, name: cleanName } : row;
+    }
+    return {
+      ...row,
+      name: cleanName,
+      title: resolved,
+    };
+  });
+}
+
 export function migratePortalData(data: PortalData): PortalData {
   const safeAthletes = Array.isArray(data.athletes) ? data.athletes : [];
   const safeTournaments = Array.isArray(data.tournaments) ? data.tournaments : [];
   const safeNews = Array.isArray(data.news) ? data.news : [];
 
-  const cleanedAthletes: Athlete[] = safeAthletes.map((a) => {
+  const dedupedAthletes: Athlete[] = [];
+  const seenAthleteKeys = new Set<string>();
+
+  safeAthletes.forEach((a) => {
     const legacy = a as Athlete & { percasiId?: string; fideId?: string };
     const { percasiId: _percasiId, fideId: _fideId, ...rest } = legacy;
-    return {
+    const key = normalizeAthleteName(rest.fullName);
+    if (key && seenAthleteKeys.has(key)) {
+      return;
+    }
+    if (key) seenAthleteKeys.add(key);
+
+    const seedMatch = key ? SEED_ATHLETE_BY_NAME.get(key) : undefined;
+    const resolvedCity =
+      rest.city && CITY_OPTIONS.includes(rest.city)
+        ? rest.city
+        : seedMatch?.city ?? inferAthleteCity(rest.club);
+    const resolvedDistrict =
+      resolvedCity !== 'Kota Batam' && (!rest.district || rest.district === 'Batam Kota')
+        ? '-'
+        : rest.district;
+
+    dedupedAthletes.push({
       ...rest,
+      fullName: stripTitleSuffix(rest.fullName),
+      city: resolvedCity,
+      district: resolvedDistrict,
       ratings: rest.ratings ?? { standard: 0, rapid: 0, blitz: 0 },
       federationStatus: 'Atlet',
       tournamentHistory: (Array.isArray(rest.tournamentHistory)
@@ -76,15 +125,16 @@ export function migratePortalData(data: PortalData): PortalData {
             ? { ...rec, category: 'Catur Cepat' }
             : rec
         ),
-    };
+    });
   });
 
   const existingNames = new Set(
-    cleanedAthletes.map((a) => normalizeAthleteName(a.fullName))
+    dedupedAthletes.map((a) => normalizeAthleteName(a.fullName))
   );
   const missingSeedAthletes = SEED_ATHLETES.filter(
     (seedAth) => !existingNames.has(normalizeAthleteName(seedAth.fullName))
   );
+  const mergedAthletes = [...dedupedAthletes, ...missingSeedAthletes];
 
   const migratedTournaments = safeTournaments
     .filter((t) => !REMOVED_TOURNAMENT_IDS.has(t.id))
@@ -114,7 +164,7 @@ export function migratePortalData(data: PortalData): PortalData {
           ),
           initialRankings: needsDarwinInitialUpgrade
             ? DARWIN_CUP_INITIAL_RANKINGS
-            : t.initialRankings,
+            : enrichInitialRankingsMasterTitles(t.initialRankings!, mergedAthletes),
           standings: safeStandings,
           pairings: safePairings,
         };
@@ -123,6 +173,14 @@ export function migratePortalData(data: PortalData): PortalData {
       if (t.id !== 'trn-kejurkot-2026') {
         return {
           ...t,
+          ...(Array.isArray(t.initialRankings)
+            ? {
+                initialRankings: enrichInitialRankingsMasterTitles(
+                  t.initialRankings,
+                  mergedAthletes
+                ),
+              }
+            : {}),
           standings: safeStandings,
           pairings: safePairings,
         };
@@ -154,7 +212,7 @@ export function migratePortalData(data: PortalData): PortalData {
           !Array.isArray(t.initialRankings) ||
           t.initialRankings.length < FIRDAUS_CUP_INITIAL_RANKINGS.length
             ? FIRDAUS_CUP_INITIAL_RANKINGS
-            : t.initialRankings,
+            : enrichInitialRankingsMasterTitles(t.initialRankings, mergedAthletes),
         standings:
           safeStandings.length === 0 ? FIRDAUS_CUP_STANDINGS : safeStandings,
         pairings:
@@ -187,9 +245,14 @@ export function migratePortalData(data: PortalData): PortalData {
     migratedTournaments.push(darwinSeed);
   }
 
+  const syncedAthletes = syncAthletesFromTournaments(
+    mergedAthletes,
+    migratedTournaments
+  );
+
   return {
     ...data,
-    athletes: [...cleanedAthletes, ...missingSeedAthletes],
+    athletes: syncedAthletes,
     tournaments: migratedTournaments,
     news: safeNews.filter((n) => !REMOVED_NEWS_IDS.has(n.id)),
   };

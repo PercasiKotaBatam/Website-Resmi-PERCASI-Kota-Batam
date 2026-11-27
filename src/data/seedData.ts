@@ -1,13 +1,17 @@
 import type {
   Athlete,
   InitialRankEntry,
+  KepriCity,
   NewsArticle,
   PortalData,
   RoundPairing,
   StandingEntry,
   Tournament,
 } from '../types/chess';
-import { sortInitialRankings } from '../utils/portalLogic';
+import {
+  sortInitialRankings,
+  syncAthletesFromTournaments,
+} from '../utils/portalLogic';
 
 export const HERO_IMAGE_URL = './assets/aistudio/IMG_20260919_105146_a1507b0b.jpg';
 export const NEWS_JUNIOR_IMAGE_URL = './src/assets/images/news_pembinaan_junior_1795156766513.jpg';
@@ -22,6 +26,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putra',
     birthYear: 1990,
     club: 'Semanggi Chess Club',
+    city: 'Kota Batam',
     district: 'Sagulung',
     ratings: { standard: 2131, rapid: 2243, blitz: 2125 },
     bio: 'National Master dari Semanggi Chess Club, Kecamatan Sagulung dengan spesialisasi permainan catur cepat dan taktis. Pemuncak daftar peringkat Rapid dan Standard Pengkot PERCASI Kota Batam.',
@@ -46,6 +51,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putra',
     birthYear: 1984,
     club: '-',
+    city: 'Kota Batam',
     district: 'Sekupang',
     ratings: { standard: 2062, rapid: 1960, blitz: 1955 },
     bio: 'National Master senior asal Kecamatan Sekupang yang tangguh pada nomor catur klasik (Standard) dengan penguasaan teknik permainan akhir yang presisi.',
@@ -70,6 +76,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putra',
     birthYear: 1986,
     club: '-',
+    city: 'Kota Batam',
     district: 'Nongsa',
     ratings: { standard: 2015, rapid: 2033, blitz: 2045 },
     bio: 'National Master asal Kecamatan Nongsa yang dikenal agresif di kontrol waktu Blitz dan Rapid serta aktif membina pecatur Kota Batam.',
@@ -94,6 +101,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putra',
     birthYear: 1992,
     club: '-',
+    city: 'Kota Batam',
     district: 'Nongsa',
     ratings: { standard: 1992, rapid: 1992, blitz: 1992 },
     bio: 'PERCASI Master dari Kecamatan Nongsa dengan performa seimbang di seluruh kontrol waktu Standard, Rapid, dan Blitz.',
@@ -118,6 +126,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putra',
     birthYear: 1993,
     club: '-',
+    city: 'Kota Batam',
     district: 'Sagulung',
     ratings: { standard: 1983, rapid: 1983, blitz: 1983 },
     bio: 'Pecatur senior asal Kecamatan Sagulung yang konsisten bersaing di papan atas turnamen tingkat Kota Batam dan Kepulauan Riau.',
@@ -142,6 +151,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putra',
     birthYear: 1989,
     club: 'Semanggi Chess Club',
+    city: 'Kota Batam',
     district: 'Sagulung',
     ratings: { standard: 1890, rapid: 1892, blitz: 1881 },
     bio: 'Atlet senior Semanggi Chess Club, Kecamatan Sagulung dengan repertoar pembukaan solid dan daya juang tinggi di turnamen sistem Swiss.',
@@ -166,6 +176,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putri',
     birthYear: 1996,
     club: '-',
+    city: 'Kota Batam',
     district: 'Lubuk Baja',
     ratings: { standard: 1884, rapid: 1880, blitz: 1880 },
     bio: 'Pecatur putri senior dari Kecamatan Lubuk Baja yang aktif memperkuat tim catur Kota Batam dalam kejuaraan beregu maupun perorangan.',
@@ -190,6 +201,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putra',
     birthYear: 1997,
     club: 'Semanggi Chess Club',
+    city: 'Kota Batam',
     district: 'Batu Aji',
     ratings: { standard: 1833, rapid: 1880, blitz: 1880 },
     bio: 'Pecatur aktif Semanggi Chess Club asal Kecamatan Batu Aji dengan kekuatan menonjol pada nomor catur cepat Rapid dan Blitz.',
@@ -214,6 +226,7 @@ const BASE_SEED_ATHLETES: Athlete[] = [
     gender: 'Putri',
     birthYear: 2004,
     club: '-',
+    city: 'Kota Batam',
     district: 'Batam Kota',
     ratings: { standard: 1618, rapid: 1618, blitz: 1618 },
     bio: 'Atlet putri asal Kecamatan Batam Kota yang aktif mengikuti turnamen resmi Pengkot PERCASI Kota Batam.',
@@ -670,8 +683,14 @@ export const FIRDAUS_CUP_STANDINGS: StandingEntry[] = [
   { rank: 90, sNo: 72, title: 'Non-Gelar', name: 'Rahadani', club: '-', rating: '-', fed: 'INA', category: 'Senior', points: 0, pointsDisplay: '0', de: 0, buchholz: 0, bhDisplay: '0', sb: 0, ps: 0, ratingChange: 0 },
 ];
 
+const SEED_NAME_ALIASES: Record<string, string> = {
+  'isma yudi': 'ismail yudi',
+  'bharata dharma surya': 'bharata surya dharma',
+  'yan fitra': 'yan vitra',
+};
+
 function normalizeSeedAthleteName(name: string): string {
-  return name
+  const clean = name
     .trim()
     .replace(
       /,\s*(GM|IM|FM|WFM|WIM|WGM|NM|MP|PM|WNM|WN|PNP|FA|AGM|AIM|AFM|ACM)$/i,
@@ -679,6 +698,7 @@ function normalizeSeedAthleteName(name: string): string {
     )
     .replace(/\s+/g, ' ')
     .toLowerCase();
+  return SEED_NAME_ALIASES[clean] ?? clean;
 }
 
 function stripSeedTitleSuffix(name: string): string {
@@ -692,31 +712,51 @@ function stripSeedTitleSuffix(name: string): string {
 }
 
 function mapClubCityToDistrictAndClub(clubCity?: string): {
+  city: KepriCity;
   district: Athlete['district'];
   club: string;
 } {
   const raw = (clubCity ?? '').trim();
   const lower = raw.toLowerCase();
-  if (lower === 'sagulung') return { district: 'Sagulung', club: '-' };
-  if (lower === 'sekupang') return { district: 'Sekupang', club: '-' };
-  if (lower === 'batu aji') return { district: 'Batu Aji', club: '-' };
-  if (lower === 'lubuk baja') return { district: 'Lubuk Baja', club: '-' };
-  if (lower === 'batam kota') return { district: 'Batam Kota', club: '-' };
+  if (lower.includes('tanjung pinang') || lower.includes('tanjungpinang')) {
+    return { city: 'Tanjung Pinang', district: '-', club: '-' };
+  }
+  if (lower.includes('bintan')) {
+    return { city: 'Bintan', district: '-', club: '-' };
+  }
+  if (lower.includes('lingga')) {
+    return { city: 'Lingga', district: '-', club: '-' };
+  }
+  if (lower.includes('karimun')) {
+    return { city: 'Karimun', district: '-', club: '-' };
+  }
+  if (lower.includes('natuna')) {
+    return { city: 'Natuna', district: '-', club: '-' };
+  }
+  if (lower.includes('anambas')) {
+    return { city: 'Anambas', district: '-', club: '-' };
+  }
+  if (lower === 'sagulung') return { city: 'Kota Batam', district: 'Sagulung', club: '-' };
+  if (lower === 'sekupang') return { city: 'Kota Batam', district: 'Sekupang', club: '-' };
+  if (lower === 'batu aji') return { city: 'Kota Batam', district: 'Batu Aji', club: '-' };
+  if (lower === 'lubuk baja') return { city: 'Kota Batam', district: 'Lubuk Baja', club: '-' };
+  if (lower === 'batam kota') return { city: 'Kota Batam', district: 'Batam Kota', club: '-' };
   if (lower === 'sei beduk' || lower === 'sungai beduk') {
-    return { district: 'Sungai Beduk', club: '-' };
+    return { city: 'Kota Batam', district: 'Sungai Beduk', club: '-' };
   }
-  if (lower === 'bengkong') return { district: 'Bengkong', club: '-' };
-  if (lower === 'nongsa') return { district: 'Nongsa', club: '-' };
+  if (lower === 'bengkong') return { city: 'Kota Batam', district: 'Bengkong', club: '-' };
+  if (lower === 'nongsa') return { city: 'Kota Batam', district: 'Nongsa', club: '-' };
   if (lower === 'junior' || lower === 'batu ampar' || !raw) {
-    return { district: 'Batam Kota', club: '-' };
+    return { city: 'Kota Batam', district: 'Batam Kota', club: '-' };
   }
-  return { district: 'Batam Kota', club: raw };
+  return { city: 'Kota Batam', district: 'Batam Kota', club: raw };
 }
 
 function buildSeedAthletes(
   baseAthletes: Athlete[],
   standings: StandingEntry[],
-  initialRankings: InitialRankEntry[]
+  initialRankings: InitialRankEntry[],
+  firdausInitialRankings: InitialRankEntry[]
 ): Athlete[] {
   const seen = new Set(baseAthletes.map((a) => normalizeSeedAthleteName(a.fullName)));
   const extras: Athlete[] = [];
@@ -763,6 +803,7 @@ function buildSeedAthletes(
           : 'Senior Putra',
       gender: isPutri ? 'Putri' : 'Putra',
       club,
+      city: 'Kota Batam',
       district,
       ratings: {
         standard: numericRating,
@@ -775,62 +816,88 @@ function buildSeedAthletes(
     });
   });
 
-  initialRankings.forEach((entry) => {
-    const key = normalizeSeedAthleteName(entry.name);
-    if (!key) return;
-    const { district, club } = mapClubCityToDistrictAndClub(entry.clubCity);
-    if (seen.has(key)) {
-      const existing = extras.find(
-        (ath) => normalizeSeedAthleteName(ath.fullName) === key
-      );
-      if (existing && existing.club === '-' && entry.clubCity) {
-        existing.district = district;
-        if (club !== '-') existing.club = club;
+  const appendFromInitialList = (
+    list: InitialRankEntry[],
+    idPrefix: string,
+    tournamentLabel: string
+  ) => {
+    list.forEach((entry) => {
+      const key = normalizeSeedAthleteName(entry.name);
+      if (!key) return;
+      const { city, district, club } = mapClubCityToDistrictAndClub(entry.clubCity);
+      if (seen.has(key)) {
+        const existing = extras.find(
+          (ath) => normalizeSeedAthleteName(ath.fullName) === key
+        );
+        if (existing && entry.clubCity) {
+          existing.city = city;
+          existing.district = district;
+          if (club !== '-' && existing.club === '-') {
+            existing.club = club;
+          }
+          if (city !== 'Kota Batam') {
+            existing.bio = `Atlet catur asal ${city} terdaftar Pengprov PERCASI Kepulauan Riau.`;
+          }
+        }
+        return;
       }
-      return;
-    }
-    seen.add(key);
+      seen.add(key);
 
-    const isPutri = String(entry.gender ?? '').trim().toLowerCase() === 'putri';
-    const isJunior = String(entry.clubCity ?? '').trim().toLowerCase() === 'junior';
-    const rawRating = entry.rating ?? entry.nationalRating;
-    const numericRating =
-      typeof rawRating === 'number' && Number.isFinite(rawRating) && rawRating > 0
-        ? rawRating
-        : 0;
+      const isPutri = String(entry.gender ?? '').trim().toLowerCase() === 'putri';
+      const isJunior = String(entry.clubCity ?? '').trim().toLowerCase() === 'junior';
+      const rawRating = entry.rating ?? entry.nationalRating;
+      const numericRating =
+        typeof rawRating === 'number' && Number.isFinite(rawRating) && rawRating > 0
+          ? rawRating
+          : 0;
+      const rawTitle = String(entry.title ?? 'Non-Gelar').trim().toUpperCase();
+      const title: Athlete['title'] =
+        rawTitle === 'NM'
+          ? 'NM'
+          : rawTitle === 'MP' || rawTitle === 'PM'
+            ? 'MP'
+            : 'Non-Gelar';
 
-    extras.push({
-      id: `ath-dc-${String(entry.sNo).padStart(3, '0')}`,
-      fullName: stripSeedTitleSuffix(entry.name),
-      title: 'Non-Gelar',
-      category: isPutri
-        ? 'Senior Putri'
-        : isJunior
-          ? 'Junior U-18'
-          : 'Senior Putra',
-      gender: isPutri ? 'Putri' : 'Putra',
-      club,
-      district,
-      ratings: {
-        standard: numericRating,
-        rapid: numericRating,
-        blitz: numericRating,
-      },
-      bio: 'Atlet catur terdaftar Pengkot PERCASI Kota Batam (Peserta Darwin Cup 2026).',
-      federationStatus: 'Atlet',
-      tournamentHistory: [],
+      extras.push({
+        id: `${idPrefix}-${String(entry.sNo).padStart(3, '0')}`,
+        fullName: stripSeedTitleSuffix(entry.name),
+        title,
+        category: isPutri
+          ? 'Senior Putri'
+          : isJunior
+            ? 'Junior U-18'
+            : 'Senior Putra',
+        gender: isPutri ? 'Putri' : 'Putra',
+        club,
+        city,
+        district,
+        ratings: {
+          standard: numericRating,
+          rapid: numericRating,
+          blitz: numericRating,
+        },
+        bio:
+          city === 'Kota Batam'
+            ? `Atlet catur terdaftar Pengkot PERCASI Kota Batam (Peserta ${tournamentLabel}).`
+            : `Atlet catur asal ${city} terdaftar Pengprov PERCASI Kepulauan Riau (Peserta ${tournamentLabel}).`,
+        federationStatus: 'Atlet',
+        tournamentHistory: [],
+      });
     });
-  });
+  };
+
+  appendFromInitialList(initialRankings, 'ath-dc', 'Darwin Cup 2026');
+  appendFromInitialList(firdausInitialRankings, 'ath-fc-init', 'Firdaus Cup 2026');
 
   return [...baseAthletes, ...extras];
 }
 
 export const FIRDAUS_CUP_INITIAL_RANKINGS: InitialRankEntry[] = [
-  { sNo: 1, name: 'Godfrid Harry Mollyson Siregar', gender: 'Putra', nationalRating: 2243, internationalRating: '-', fed: 'INA', clubCity: 'Sagulung' },
-  { sNo: 2, name: 'Sahat Sitanggang', gender: 'Putra', nationalRating: 2033, internationalRating: '-', fed: 'INA', clubCity: 'SSC' },
+  { sNo: 1, name: 'Godfrid Harry Mollyson Siregar', title: 'NM', gender: 'Putra', nationalRating: 2243, internationalRating: '-', fed: 'INA', clubCity: 'Sagulung' },
+  { sNo: 2, name: 'Sahat Sitanggang', title: 'NM', gender: 'Putra', nationalRating: 2033, internationalRating: '-', fed: 'INA', clubCity: 'SSC' },
   { sNo: 3, name: 'Yanurisman Candra', gender: 'Putra', nationalRating: 2026, internationalRating: '-', fed: 'INA', clubCity: 'Kepri - Tanjung Pinang' },
-  { sNo: 4, name: 'Suhandri', gender: 'Putra', nationalRating: 1992, internationalRating: '-', fed: 'INA', clubCity: 'KOCAK' },
-  { sNo: 5, name: 'Nurdin Simanjuntak', gender: 'Putra', nationalRating: 1960, internationalRating: '-', fed: 'INA', clubCity: 'Sekupang' },
+  { sNo: 4, name: 'Suhandri', title: 'MP', gender: 'Putra', nationalRating: 1992, internationalRating: '-', fed: 'INA', clubCity: 'KOCAK' },
+  { sNo: 5, name: 'Nurdin Simanjuntak', title: 'NM', gender: 'Putra', nationalRating: 1960, internationalRating: '-', fed: 'INA', clubCity: 'Sekupang' },
   { sNo: 6, name: 'Jonathan Charmian Vivaldy', gender: 'Putra', nationalRating: 1896, internationalRating: 1875, fed: 'INA', clubCity: 'Pokemonster' },
   { sNo: 7, name: 'Jon Toni', gender: 'Putra', nationalRating: 1892, internationalRating: '-', fed: 'INA', clubCity: 'Sagulung' },
   { sNo: 8, name: 'Aldriyanto Syarif', gender: 'Putra', nationalRating: 1880, internationalRating: '-', fed: 'INA', clubCity: 'Sagulung' },
@@ -995,14 +1062,9 @@ export const DARWIN_CUP_INITIAL_RANKINGS: InitialRankEntry[] = sortInitialRankin
       rating: row.nationalRating,
       fed: row.fed,
       clubCity: row.clubCity,
+      ...(row.title ? { title: row.title } : {}),
     };
   })
-);
-
-export const SEED_ATHLETES: Athlete[] = buildSeedAthletes(
-  BASE_SEED_ATHLETES,
-  FIRDAUS_CUP_STANDINGS,
-  DARWIN_CUP_INITIAL_RANKINGS
 );
 
 export const SEED_TOURNAMENTS: Tournament[] = [
@@ -1052,11 +1114,21 @@ export const SEED_TOURNAMENTS: Tournament[] = [
   },
 ];
 
+export const SEED_ATHLETES: Athlete[] = syncAthletesFromTournaments(
+  buildSeedAthletes(
+    BASE_SEED_ATHLETES,
+    FIRDAUS_CUP_STANDINGS,
+    DARWIN_CUP_INITIAL_RANKINGS,
+    FIRDAUS_CUP_INITIAL_RANKINGS
+  ),
+  SEED_TOURNAMENTS
+);
+
 export const SEED_NEWS: NewsArticle[] = [];
 
 export const SEED_PORTAL_DATA: PortalData = {
   version: '3.0',
-  updatedAt: '2026-11-27T11:50:00.000Z',
+  updatedAt: '2026-11-27T14:00:00.000Z',
   athletes: SEED_ATHLETES,
   tournaments: SEED_TOURNAMENTS,
   news: SEED_NEWS,

@@ -1,4 +1,5 @@
 import {
+  FIRDAUS_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_ROUND_1_PAIRINGS,
   FIRDAUS_CUP_ROUND_2_PAIRINGS,
   FIRDAUS_CUP_ROUND_3_PAIRINGS,
@@ -38,7 +39,11 @@ const REMOVED_NEWS_IDS = new Set([
 ]);
 
 export function migratePortalData(data: PortalData): PortalData {
-  const cleanedAthletes: Athlete[] = data.athletes.map((a) => {
+  const safeAthletes = Array.isArray(data.athletes) ? data.athletes : [];
+  const safeTournaments = Array.isArray(data.tournaments) ? data.tournaments : [];
+  const safeNews = Array.isArray(data.news) ? data.news : [];
+
+  const cleanedAthletes: Athlete[] = safeAthletes.map((a) => {
     const legacy = a as Athlete & { percasiId?: string; fideId?: string };
     const { percasiId: _percasiId, fideId: _fideId, ...rest } = legacy;
     return {
@@ -71,10 +76,18 @@ export function migratePortalData(data: PortalData): PortalData {
   return {
     ...data,
     athletes: [...cleanedAthletes, ...missingSeedAthletes],
-    tournaments: data.tournaments
+    tournaments: safeTournaments
       .filter((t) => !REMOVED_TOURNAMENT_IDS.has(t.id))
       .map((t) => {
-        if (t.id !== 'trn-kejurkot-2026') return t;
+        const safeStandings = Array.isArray(t.standings) ? t.standings : [];
+        const safePairings = Array.isArray(t.pairings) ? t.pairings : [];
+        if (t.id !== 'trn-kejurkot-2026') {
+          return {
+            ...t,
+            standings: safeStandings,
+            pairings: safePairings,
+          };
+        }
         const isLegacyNameOrTc =
           t.name === 'Kejurkot Catur Kota Batam 2026' ||
           t.timeControlCategory === 'Standard';
@@ -98,16 +111,33 @@ export function migratePortalData(data: PortalData): PortalData {
             ? '10 menit + 3 detik'
             : t.timeControlDetail,
           description: isLegacyNameOrTc ? '' : t.description,
+          initialRankings:
+            !Array.isArray(t.initialRankings) ||
+            t.initialRankings.length < FIRDAUS_CUP_INITIAL_RANKINGS.length
+              ? FIRDAUS_CUP_INITIAL_RANKINGS
+              : t.initialRankings,
           standings:
-            t.standings.length === 0 ? FIRDAUS_CUP_STANDINGS : t.standings,
+            safeStandings.length === 0 ? FIRDAUS_CUP_STANDINGS : safeStandings,
           pairings:
-            t.pairings.length > FIRDAUS_CUP_CANONICAL_PAIRINGS.length ||
-            t.pairings.length === 0
+            safePairings.length === 0 ||
+            safePairings.some(
+              (p, i) =>
+                safePairings.findIndex(
+                  (q, j) =>
+                    j !== i &&
+                    q.round === p.round &&
+                    (q.board === p.board ||
+                      normalizeAthleteName(q.whiteName) ===
+                        normalizeAthleteName(p.whiteName) ||
+                      normalizeAthleteName(q.blackName) ===
+                        normalizeAthleteName(p.blackName))
+                ) >= 0
+            )
               ? FIRDAUS_CUP_CANONICAL_PAIRINGS
-              : t.pairings,
+              : safePairings,
         };
       }),
-    news: data.news.filter((n) => !REMOVED_NEWS_IDS.has(n.id)),
+    news: safeNews.filter((n) => !REMOVED_NEWS_IDS.has(n.id)),
   };
 }
 

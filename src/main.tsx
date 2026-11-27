@@ -53,6 +53,14 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundary
   }
 }
 
+declare global {
+  interface Window {
+    __percasiPortalMounted?: boolean;
+  }
+}
+
+window.__percasiPortalMounted = true;
+
 createRoot(document.getElementById('root')!).render(
   <RootErrorBoundary>
     <App />

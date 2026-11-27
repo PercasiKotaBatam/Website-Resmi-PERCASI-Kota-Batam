@@ -105,6 +105,20 @@ export interface RoundPairing {
   result: '1-0' | '0-1' | '½-½' | '*' | string;
 }
 
+export interface InitialRankEntry {
+  sNo: number;
+  name: string;
+  gender?: 'Putra' | 'Putri' | string;
+  nationalRating?: number | string;
+  internationalRating?: number | string;
+  fed?: string;
+  clubCity?: string;
+  rating?: number | string;
+  category?: string;
+  title?: TitleCode | string;
+  club?: string;
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -119,6 +133,7 @@ export interface Tournament {
   organizer: string;
   participantsCount: number;
   description: string;
+  initialRankings?: InitialRankEntry[];
   standings: StandingEntry[];
   pairings: RoundPairing[];
 }

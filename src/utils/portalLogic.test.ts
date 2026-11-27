@@ -10,8 +10,12 @@ import {
   formatRatingDelta,
   generateSampleCsvTemplate,
   generateSampleExcelBytes,
+  generateSamplePairingsExcelBytes,
   getInitials,
+  mergeRoundPairings,
   normalizeAthleteName,
+  parsePairingsCsv,
+  parsePairingsExcelBuffer,
   parseStandingsCsv,
   parseStandingsExcelBuffer,
   parseStandingsJson,
@@ -19,6 +23,7 @@ import {
   validatePortalBackup,
 } from './portalLogic';
 import {
+  FIRDAUS_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_ROUND_1_PAIRINGS,
   FIRDAUS_CUP_ROUND_2_PAIRINGS,
   FIRDAUS_CUP_ROUND_3_PAIRINGS,
@@ -368,20 +373,35 @@ test('migratePortalData purges stale duplicated pairings from cached Firdaus Cup
   assert.equal(suhandri.blackStats.losses, 0);
 });
 
-test('Only Firdaus Cup 2026 and zero news exist in seed, and initial rankings / round filter work accurately', () => {
+test('Only Firdaus Cup 2026 and zero news exist in seed, and 148-player initial rankings / round filter work accurately', () => {
   assert.equal(SEED_TOURNAMENTS.length, 1);
   assert.equal(SEED_TOURNAMENTS[0]?.id, 'trn-kejurkot-2026');
   assert.equal(SEED_TOURNAMENTS[0]?.name, 'Firdaus Cup 2026');
   assert.equal(SEED_NEWS.length, 0);
 
-  const initial = buildInitialRankings(FIRDAUS_CUP_STANDINGS);
-  assert.equal(initial.length, 92);
-  assert.equal(initial[0]?.sNo, 1);
-  assert.equal(initial[0]?.name, 'Godfrid Harry Mollyson Siregar, NM');
-  assert.equal(initial[3]?.sNo, 4);
-  assert.equal(initial[3]?.name, 'Suhandri, PM');
-  assert.equal(initial[91]?.sNo, 92);
-  assert.equal(initial[91]?.name, 'Zulkifli Ritonga');
+  assert.equal(FIRDAUS_CUP_INITIAL_RANKINGS.length, 148);
+  const customInitial = buildInitialRankings(
+    FIRDAUS_CUP_STANDINGS,
+    SEED_TOURNAMENTS[0]?.initialRankings
+  );
+  assert.equal(customInitial.length, 148);
+  assert.equal(customInitial[0]?.sNo, 1);
+  assert.equal(customInitial[0]?.name, 'Godfrid Harry Mollyson Siregar');
+  assert.equal(customInitial[0]?.gender, 'Putra');
+  assert.equal(customInitial[0]?.nationalRating, 2243);
+  assert.equal(customInitial[0]?.clubCity, 'Sagulung');
+  assert.equal(customInitial[5]?.name, 'Jonathan Charmian Vivaldy');
+  assert.equal(customInitial[5]?.nationalRating, 1896);
+  assert.equal(customInitial[5]?.internationalRating, 1875);
+  assert.equal(customInitial[26]?.name, 'Angel Priscilla Simanjuntak');
+  assert.equal(customInitial[26]?.gender, 'Putri');
+  assert.equal(customInitial[147]?.sNo, 148);
+  assert.equal(customInitial[147]?.name, 'Zulkifli Ritonga');
+  assert.equal(customInitial[147]?.clubCity, 'Batam Kota');
+
+  const fallbackInitial = buildInitialRankings(FIRDAUS_CUP_STANDINGS);
+  assert.equal(fallbackInitial.length, 92);
+  assert.equal(fallbackInitial[0]?.sNo, 1);
 
   const pairings = SEED_TOURNAMENTS[0]?.pairings ?? [];
   assert.deepEqual(filterPairingsByRound(pairings, 3), [3]);
@@ -477,4 +497,98 @@ test('All 92 Firdaus Cup 2026 participants are registered as Atlet without ID PE
     assert.equal('percasiId' in athlete, false);
     assert.equal('fideId' in athlete, false);
   });
+});
+
+test('migratePortalData upgrades cached Firdaus Cup initialRankings to 148 players while preserving valid extra rounds', () => {
+  const cachedWithOldInitialAndRound8 = {
+    ...SEED_PORTAL_DATA,
+    tournaments: SEED_PORTAL_DATA.tournaments.map((t) =>
+      t.id === 'trn-kejurkot-2026'
+        ? {
+            ...t,
+            initialRankings: undefined,
+            pairings: [
+              ...t.pairings,
+              { round: 8, board: 1, whiteName: 'Suhandri, PM', blackName: 'Nurdin Simanjuntak, NM', result: '1 - 0' },
+            ],
+          }
+        : t
+    ),
+  };
+
+  const migrated = migratePortalData(cachedWithOldInitialAndRound8);
+  assert.equal(migrated.tournaments[0]?.initialRankings?.length, 148);
+  assert.equal(migrated.tournaments[0]?.pairings.length, 323);
+  assert.equal(migrated.tournaments[0]?.pairings.some((p) => p.round === 8), true);
+});
+
+test('parsePairingsExcelBuffer and mergeRoundPairings parse .xlsx/.xls Swiss-Manager round pairings and merge by round', () => {
+  const sampleBytes = generateSamplePairingsExcelBytes(4);
+  const parsedSample = parsePairingsExcelBuffer(sampleBytes, 4);
+  assert.equal(parsedSample.errors.length, 0);
+  assert.equal(parsedSample.pairings.length, 3);
+  assert.deepEqual(parsedSample.detectedRounds, [4]);
+  assert.equal(parsedSample.pairings[0]?.whiteSeed, 1);
+  assert.equal(parsedSample.pairings[0]?.blackSeed, 2);
+  assert.equal(parsedSample.pairings[0]?.result, '1 - 0');
+  assert.equal(parsedSample.pairings[1]?.result, '½ - ½');
+  assert.equal(parsedSample.pairings[2]?.result, '*');
+
+  // Swiss-Manager export with repeated S. No. and Pts headers in .xls format
+  const swissPairingSheet = XLSX.utils.aoa_to_sheet([
+    ['Pairing Round 5'],
+    ['Bo.', 'S. No.', 'Putih', 'Pts', 'Res.', 'Pts', 'Hitam', 'S. No.'],
+    [1, 7, 'Jon Toni', '4', '0 - 1', '4', 'Jonathan Charmian Vivaldy', 6],
+    [2, 4, 'Suhandri, PM', '3½', '1/2-1/2', '3½', 'Sahat Sitanggang, NM', 2],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, swissPairingSheet, 'Babak 5');
+  const xlsBytes = XLSX.write(wb, { bookType: 'biff8', type: 'array' }) as ArrayBuffer;
+
+  const parsedSwiss = parsePairingsExcelBuffer(xlsBytes, 5);
+  assert.equal(parsedSwiss.errors.length, 0);
+  assert.equal(parsedSwiss.pairings.length, 2);
+  assert.equal(parsedSwiss.pairings[0]?.round, 5);
+  assert.equal(parsedSwiss.pairings[0]?.whiteSeed, 7);
+  assert.equal(parsedSwiss.pairings[0]?.blackSeed, 6);
+  assert.equal(parsedSwiss.pairings[0]?.whitePoints, '4');
+  assert.equal(parsedSwiss.pairings[1]?.result, '½ - ½');
+
+  // Multi-sheet workbook auto-detection
+  const multiWb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    multiWb,
+    XLSX.utils.aoa_to_sheet([
+      ['Meja', 'Putih', 'Hasil', 'Hitam'],
+      [1, 'Pemain A', '1 - 0', 'Pemain B'],
+    ]),
+    'Babak 1'
+  );
+  XLSX.utils.book_append_sheet(
+    multiWb,
+    XLSX.utils.aoa_to_sheet([
+      ['Meja', 'Putih', 'Hasil', 'Hitam'],
+      [1, 'Pemain B', '0 - 1', 'Pemain A'],
+    ]),
+    'Babak 2'
+  );
+  const multiBytes = XLSX.write(multiWb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  const parsedMulti = parsePairingsExcelBuffer(multiBytes);
+  assert.equal(parsedMulti.errors.length, 0);
+  assert.deepEqual(parsedMulti.detectedRounds, [1, 2]);
+  assert.equal(parsedMulti.pairings.length, 2);
+
+  // Merge replaces only target round while keeping other rounds intact
+  const merged = mergeRoundPairings(parsedMulti.pairings, parsedSwiss.pairings, [5]);
+  assert.equal(merged.length, 4);
+  assert.deepEqual(
+    merged.map((m) => m.round),
+    [1, 2, 5, 5]
+  );
+
+  // CSV pairing parsing
+  const csvResult = parsePairingsCsv('Meja,Putih,Hasil,Hitam\n1,Suhandri,1-0,Sahat Sitanggang', 3);
+  assert.equal(csvResult.errors.length, 0);
+  assert.equal(csvResult.pairings[0]?.round, 3);
+  assert.equal(csvResult.pairings[0]?.result, '1 - 0');
 });

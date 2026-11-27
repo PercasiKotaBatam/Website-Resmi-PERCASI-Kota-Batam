@@ -15,6 +15,36 @@
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased selection:bg-[#0F2342] selection:text-white">
     <div id="root"></div>
+    <script>
+      window.__percasiPortalMounted = false;
+      function showPercasiMountFallback() {
+        if (window.__percasiPortalMounted) return;
+        var root = document.getElementById('root');
+        if (!root || root.childElementCount > 0) return;
+        root.innerHTML =
+          '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:sans-serif;background:#f8fafc;color:#0f172a">' +
+          '<div style="max-width:440px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:24px;text-align:center">' +
+          '<h1 style="margin:0;font-size:18px;font-weight:800;color:#0F2342">Portal PERCASI Kota Batam</h1>' +
+          '<p style="margin:10px 0 0;font-size:14px;color:#475569">Halaman gagal dimuat sempurna. Silakan muat ulang atau bersihkan cache peramban.</p>' +
+          '<button type="button" onclick="window.location.reload()" style="margin-top:16px;padding:10px 16px;border:0;border-radius:6px;background:#0F2342;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Muat Ulang</button>' +
+          '</div></div>';
+      }
+      window.addEventListener(
+        'error',
+        function (ev) {
+          var t = ev && ev.target;
+          if (t && t !== window && t.tagName && t.tagName !== 'SCRIPT') return;
+          showPercasiMountFallback();
+        },
+        true
+      );
+      window.addEventListener('unhandledrejection', function () {
+        showPercasiMountFallback();
+      });
+      window.addEventListener('load', function () {
+        window.setTimeout(showPercasiMountFallback, 1500);
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

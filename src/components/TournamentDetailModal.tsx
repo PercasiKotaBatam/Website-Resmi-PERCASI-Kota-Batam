@@ -60,7 +60,17 @@ export function TournamentDetailModal({
     tournament.pairings,
     effectiveRound
   );
-  const initialRankings = buildInitialRankings(tournament.standings);
+  const initialRankings = buildInitialRankings(
+    tournament.standings,
+    tournament.initialRankings
+  );
+  const hasExtendedInitialCols = initialRankings.some(
+    (row) =>
+      row.gender !== undefined ||
+      row.nationalRating !== undefined ||
+      row.internationalRating !== undefined ||
+      row.clubCity !== undefined
+  );
 
   return (
     <div
@@ -363,7 +373,75 @@ export function TournamentDetailModal({
               <div className="rounded-md border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
                 Data peringkat awal belum dipublikasikan untuk turnamen ini.
               </div>
-            ) : initialRankings.some((row) => row.sNo !== undefined) ? (
+            ) : hasExtendedInitialCols ? (
+              <div className="overflow-hidden rounded-md border border-slate-200">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
+                        <th scope="col" className="w-16 px-3 py-2.5 text-center whitespace-nowrap">
+                          S. No.
+                        </th>
+                        <th scope="col" className="px-3 py-2.5">
+                          Name
+                        </th>
+                        <th scope="col" className="w-20 px-3 py-2.5 text-center whitespace-nowrap">
+                          Gender
+                        </th>
+                        <th scope="col" className="w-20 px-3 py-2.5 text-center whitespace-nowrap">
+                          N. Rtg
+                        </th>
+                        <th scope="col" className="w-20 px-3 py-2.5 text-center whitespace-nowrap">
+                          I. Rtg
+                        </th>
+                        <th scope="col" className="w-16 px-3 py-2.5 text-center whitespace-nowrap">
+                          FED
+                        </th>
+                        <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+                          Club/City
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {initialRankings.map((row, idx) => (
+                        <tr
+                          key={`init-ext-${row.sNo}-${row.name}-${idx}`}
+                          className="hover:bg-slate-50"
+                        >
+                          <td className="font-mono-tabular px-3 py-2 text-center font-bold text-[#0F2342]">
+                            {row.sNo}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() => onSelectAthlete(row.name, tournament.id)}
+                              className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+                            >
+                              {row.name}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2 text-center text-slate-700 whitespace-nowrap">
+                            {row.gender ?? '-'}
+                          </td>
+                          <td className="font-mono-tabular px-3 py-2 text-center text-slate-700">
+                            {row.nationalRating ?? row.rating ?? '-'}
+                          </td>
+                          <td className="font-mono-tabular px-3 py-2 text-center text-slate-700">
+                            {row.internationalRating ?? '-'}
+                          </td>
+                          <td className="font-mono-tabular px-3 py-2 text-center text-slate-600">
+                            {row.fed ?? '-'}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                            {row.clubCity ?? row.club ?? '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : initialRankings.some((row) => row.rating !== undefined || row.fed !== undefined || row.category !== undefined) ? (
               <div className="overflow-hidden rounded-md border border-slate-200">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[600px] border-collapse text-left text-xs">
@@ -389,7 +467,7 @@ export function TournamentDetailModal({
                     <tbody className="divide-y divide-slate-100">
                       {initialRankings.map((row, idx) => (
                         <tr
-                          key={`init-${row.sNo ?? row.rank}-${row.name}`}
+                          key={`init-${row.sNo}-${row.name}-${idx}`}
                           className="hover:bg-slate-50"
                         >
                           <td className="font-mono-tabular px-3 py-2 text-center font-bold text-[#0F2342]">
@@ -449,7 +527,7 @@ export function TournamentDetailModal({
                             #{row.sNo ?? idx + 1}
                           </td>
                           <td className="px-3 py-2.5">
-                            <TitleBadge title={row.title} />
+                            <TitleBadge title={row.title ?? 'Non-Gelar'} />
                           </td>
                           <td className="px-3 py-2.5 font-semibold text-slate-900">
                             <button
@@ -461,7 +539,7 @@ export function TournamentDetailModal({
                             </button>
                           </td>
                           <td className="px-3 py-2.5 text-xs text-slate-600">
-                            {row.club}
+                            {row.club ?? '-'}
                           </td>
                         </tr>
                       ))}

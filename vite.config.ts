@@ -7,9 +7,26 @@ import {defineConfig} from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function resolveViteBase(): string {
+  const explicitBase = (process.env.VITE_BASE_PATH ?? '').trim();
+  if (explicitBase) {
+    const normalized = explicitBase.replace(/^\/+|\/+$/g, '');
+    return normalized ? `/${normalized}/` : '/';
+  }
+  if (process.env.GITHUB_ACTIONS === 'true' && process.env.GITHUB_REPOSITORY) {
+    const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+    if (repo) {
+      return repo.toLowerCase() === `${(owner ?? '').toLowerCase()}.github.io`
+        ? '/'
+        : `/${repo}/`;
+    }
+  }
+  return './';
+}
+
 export default defineConfig(() => {
   return {
-    base: './',
+    base: resolveViteBase(),
     plugins: [
       react(),
       tailwindcss(),
@@ -28,6 +45,11 @@ export default defineConfig(() => {
           const distAssets = path.resolve(distDir, 'src/assets');
           if (fs.existsSync(distDir) && fs.existsSync(srcAssets)) {
             fs.cpSync(srcAssets, distAssets, {recursive: true, force: true});
+          }
+          const indexHtml = path.resolve(distDir, 'index.html');
+          const notFoundHtml = path.resolve(distDir, '404.html');
+          if (fs.existsSync(indexHtml)) {
+            fs.copyFileSync(indexHtml, notFoundHtml);
           }
         },
       },

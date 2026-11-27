@@ -3,6 +3,7 @@ import type {
   Athlete,
   AthleteCategory,
   BatamDistrict,
+  InitialRankEntry,
   PortalData,
   RatingCategory,
   RoundPairing,
@@ -642,6 +643,484 @@ export function generateSampleExcelBytes(): Uint8Array {
   return new Uint8Array(out);
 }
 
+export interface PairingsParseResult {
+  pairings: RoundPairing[];
+  detectedRounds: number[];
+  errors: string[];
+}
+
+function normalizePairingResult(raw: unknown): string {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed || trimmed === '*') return '*';
+  const compact = trimmed.replace(/\s+/g, '').toUpperCase();
+  if (compact === '1-0') return '1 - 0';
+  if (compact === '0-1') return '0 - 1';
+  if (
+    compact === '½-½' ||
+    compact === '1/2-1/2' ||
+    compact === '0.5-0.5' ||
+    compact === '0,5-0,5'
+  ) {
+    return '½ - ½';
+  }
+  if (compact === '1F-0F') return '1F - 0F';
+  if (compact === '0F-1F') return '0F - 1F';
+  if (compact === '0F-0F') return '0F - 0F';
+  return trimmed;
+}
+
+function parseOptionalInt(raw: unknown): number | undefined {
+  const s = String(raw ?? '').trim();
+  if (!s) return undefined;
+  const n = Number.parseInt(s, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseOptionalDisplayScore(raw: unknown): string | undefined {
+  const s = String(raw ?? '').trim();
+  return s ? s : undefined;
+}
+
+function extractRoundFromSheetName(sheetName: string): number | undefined {
+  const match = sheetName.match(/(?:babak|round|rnd|rd)\s*[-_:]?\s*(\d+)/i);
+  if (match) {
+    const n = Number.parseInt(match[1], 10);
+    if (Number.isFinite(n) && n >= 1) return n;
+  }
+  if (/^\d+$/.test(sheetName.trim())) {
+    const n = Number.parseInt(sheetName.trim(), 10);
+    if (Number.isFinite(n) && n >= 1) return n;
+  }
+  return undefined;
+}
+
+export function parsePairingsMatrix(
+  rows: unknown[][],
+  defaultRound = 1,
+  overrideRound?: number
+): PairingsParseResult {
+  const nonEmptyRows = rows.filter((row) =>
+    row.some((cell) => String(cell ?? '').trim() !== '')
+  );
+
+  if (nonEmptyRows.length === 0) {
+    return {
+      pairings: [],
+      detectedRounds: [],
+      errors: ['Berkas Excel pairing kosong atau tidak memiliki baris data.'],
+    };
+  }
+
+  let headerRowIdx = nonEmptyRows.findIndex((row) => {
+    const tokens = row.map(normalizeHeaderToken);
+    const hasWhite = tokens.some((t) =>
+      ['putih', 'white', 'namaputih', 'whitename', 'buahputih'].includes(t)
+    );
+    const hasBlack = tokens.some((t) =>
+      ['hitam', 'black', 'namahitam', 'blackname', 'buahhitam'].includes(t)
+    );
+    return hasWhite && hasBlack;
+  });
+
+  const hasHeaderRow = headerRowIdx >= 0;
+  if (headerRowIdx < 0) {
+    headerRowIdx = 0;
+  }
+
+  const headers = nonEmptyRows[headerRowIdx].map(normalizeHeaderToken);
+
+  let roundIdx = -1;
+  let boardIdx = -1;
+  let whiteSeedIdx = -1;
+  let whiteTitleIdx = -1;
+  let whiteNameIdx = -1;
+  let whitePointsIdx = -1;
+  let resultIdx = -1;
+  let blackPointsIdx = -1;
+  let blackNameIdx = -1;
+  let blackTitleIdx = -1;
+  let blackSeedIdx = -1;
+
+  if (hasHeaderRow) {
+    roundIdx = headers.findIndex((h) =>
+      ['babak', 'round', 'rnd', 'rd'].includes(h)
+    );
+    boardIdx = headers.findIndex((h) =>
+      ['bo', 'board', 'meja', 'no'].includes(h)
+    );
+    whiteNameIdx = headers.findIndex((h) =>
+      ['putih', 'white', 'namaputih', 'whitename', 'buahputih'].includes(h)
+    );
+    blackNameIdx = headers.findIndex((h) =>
+      ['hitam', 'black', 'namahitam', 'blackname', 'buahhitam'].includes(h)
+    );
+    resultIdx = headers.findIndex((h) =>
+      ['res', 'result', 'hasil', 'skor', 'score'].includes(h)
+    );
+    whiteTitleIdx = headers.findIndex((h) =>
+      ['gelarputih', 'whitetitle', 'titputih'].includes(h)
+    );
+    blackTitleIdx = headers.findIndex((h) =>
+      ['gelarhitam', 'blacktitle', 'tithitam'].includes(h)
+    );
+
+    const explicitWhiteSeedIdx = headers.findIndex((h) =>
+      ['snoputih', 'whiteseed', 'whitesno', 'noputih'].includes(h)
+    );
+    const explicitBlackSeedIdx = headers.findIndex((h) =>
+      ['snohitam', 'blackseed', 'blacksno', 'nohitam'].includes(h)
+    );
+    const explicitWhitePtsIdx = headers.findIndex((h) =>
+      ['poinputih', 'ptsputih', 'whitepts', 'whitepoints'].includes(h)
+    );
+    const explicitBlackPtsIdx = headers.findIndex((h) =>
+      ['poinhitam', 'ptshitam', 'blackpts', 'blackpoints'].includes(h)
+    );
+
+    const snoIndices = headers
+      .map((h, i) => (['sno', 'seed', 'startno'].includes(h) ? i : -1))
+      .filter((i) => i >= 0);
+
+    whiteSeedIdx =
+      explicitWhiteSeedIdx >= 0
+        ? explicitWhiteSeedIdx
+        : snoIndices.find((i) => i < whiteNameIdx) ?? -1;
+    blackSeedIdx =
+      explicitBlackSeedIdx >= 0
+        ? explicitBlackSeedIdx
+        : snoIndices.find((i) => i > blackNameIdx) ?? -1;
+
+    const ptsIndices = headers
+      .map((h, i) => (['pts', 'poin', 'points'].includes(h) ? i : -1))
+      .filter((i) => i >= 0);
+
+    const splitBoundary = resultIdx >= 0 ? resultIdx : blackNameIdx;
+    whitePointsIdx =
+      explicitWhitePtsIdx >= 0
+        ? explicitWhitePtsIdx
+        : ptsIndices.find((i) => i < splitBoundary) ?? -1;
+    blackPointsIdx =
+      explicitBlackPtsIdx >= 0
+        ? explicitBlackPtsIdx
+        : ptsIndices.find((i) => i > resultIdx && i <= blackNameIdx) ??
+          ptsIndices.find((i) => i > whiteNameIdx && i !== whitePointsIdx) ??
+          -1;
+  } else {
+    const sampleRow = nonEmptyRows[0] ?? [];
+    if (sampleRow.length >= 8) {
+      boardIdx = 0;
+      whiteSeedIdx = 1;
+      whiteNameIdx = 2;
+      whitePointsIdx = 3;
+      resultIdx = 4;
+      blackPointsIdx = 5;
+      blackNameIdx = 6;
+      blackSeedIdx = 7;
+    } else if (sampleRow.length >= 5) {
+      roundIdx = 0;
+      boardIdx = 1;
+      whiteNameIdx = 2;
+      resultIdx = 3;
+      blackNameIdx = 4;
+    } else {
+      boardIdx = 0;
+      whiteNameIdx = 1;
+      resultIdx = 2;
+      blackNameIdx = 3;
+    }
+  }
+
+  const dataRows = hasHeaderRow
+    ? nonEmptyRows.slice(headerRowIdx + 1)
+    : nonEmptyRows;
+
+  if (dataRows.length === 0) {
+    return {
+      pairings: [],
+      detectedRounds: [],
+      errors: ['Berkas pairing hanya berisi judul kolom tanpa data pertandingan.'],
+    };
+  }
+
+  const pairings: RoundPairing[] = [];
+  const errors: string[] = [];
+  const boardCounters = new Map<number, number>();
+
+  dataRows.forEach((cols, idx) => {
+    const rowNumber = headerRowIdx + idx + (hasHeaderRow ? 2 : 1);
+    const whiteName =
+      whiteNameIdx >= 0 ? String(cols[whiteNameIdx] ?? '').trim() : '';
+    const blackName =
+      blackNameIdx >= 0 ? String(cols[blackNameIdx] ?? '').trim() : '';
+
+    if (!whiteName && !blackName) {
+      return;
+    }
+
+    const firstCellLower = String(cols[0] ?? '').trim().toLowerCase();
+    if (
+      (firstCellLower.startsWith('chess-results') ||
+        firstCellLower.startsWith('program') ||
+        firstCellLower.startsWith('notes')) &&
+      !blackName
+    ) {
+      return;
+    }
+
+    if (!whiteName || !blackName) {
+      errors.push(
+        `Baris ${rowNumber}: Nama pemain Putih dan Hitam wajib diisi (gunakan "BYE" jika bye).`
+      );
+      return;
+    }
+
+    const parsedRound =
+      overrideRound !== undefined
+        ? overrideRound
+        : roundIdx >= 0
+          ? parseOptionalInt(cols[roundIdx]) ?? defaultRound
+          : defaultRound;
+    const round = parsedRound >= 1 ? parsedRound : defaultRound;
+
+    const nextBoard = (boardCounters.get(round) ?? 0) + 1;
+    const parsedBoard = boardIdx >= 0 ? parseOptionalInt(cols[boardIdx]) : undefined;
+    const board = parsedBoard && parsedBoard >= 1 ? parsedBoard : nextBoard;
+    boardCounters.set(round, Math.max(nextBoard, board));
+
+    const entry: RoundPairing = {
+      round,
+      board,
+      whiteName,
+      blackName,
+      result:
+        resultIdx >= 0 ? normalizePairingResult(cols[resultIdx]) : '*',
+    };
+
+    const whiteSeed =
+      whiteSeedIdx >= 0 ? parseOptionalInt(cols[whiteSeedIdx]) : undefined;
+    const blackSeed =
+      blackSeedIdx >= 0 ? parseOptionalInt(cols[blackSeedIdx]) : undefined;
+    const whitePoints =
+      whitePointsIdx >= 0
+        ? parseOptionalDisplayScore(cols[whitePointsIdx])
+        : undefined;
+    const blackPoints =
+      blackPointsIdx >= 0
+        ? parseOptionalDisplayScore(cols[blackPointsIdx])
+        : undefined;
+    const whiteTitle =
+      whiteTitleIdx >= 0 ? String(cols[whiteTitleIdx] ?? '').trim() : '';
+    const blackTitle =
+      blackTitleIdx >= 0 ? String(cols[blackTitleIdx] ?? '').trim() : '';
+
+    if (whiteSeed !== undefined) entry.whiteSeed = whiteSeed;
+    if (blackSeed !== undefined) entry.blackSeed = blackSeed;
+    if (whitePoints !== undefined) entry.whitePoints = whitePoints;
+    if (blackPoints !== undefined) entry.blackPoints = blackPoints;
+    if (whiteTitle) entry.whiteTitle = whiteTitle;
+    if (blackTitle) entry.blackTitle = blackTitle;
+
+    pairings.push(entry);
+  });
+
+  if (pairings.length === 0 && errors.length === 0) {
+    errors.push('Tidak ditemukan baris pairing pertandingan yang valid.');
+  }
+
+  pairings.sort((a, b) => (a.round !== b.round ? a.round - b.round : a.board - b.board));
+  const detectedRounds = Array.from(new Set(pairings.map((p) => p.round))).sort(
+    (a, b) => a - b
+  );
+
+  return { pairings, detectedRounds, errors };
+}
+
+export function parsePairingsCsv(
+  csvText: string,
+  targetRound?: number
+): PairingsParseResult {
+  const rawLines = csvText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (rawLines.length === 0) {
+    return {
+      pairings: [],
+      detectedRounds: [],
+      errors: ['Berkas CSV pairing kosong atau tidak memiliki baris data.'],
+    };
+  }
+
+  const headerLine = rawLines[0];
+  const commaCount = (headerLine.match(/,/g) ?? []).length;
+  const semiCount = (headerLine.match(/;/g) ?? []).length;
+  const delimiter = semiCount > commaCount ? ';' : ',';
+  const matrix = rawLines.map((line) => splitDelimitedLine(line, delimiter));
+  return parsePairingsMatrix(matrix, targetRound ?? 1, targetRound);
+}
+
+export function parsePairingsExcelBuffer(
+  data: ArrayBuffer | Uint8Array,
+  targetRound?: number
+): PairingsParseResult {
+  try {
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    if (bytes.byteLength === 0) {
+      return {
+        pairings: [],
+        detectedRounds: [],
+        errors: ['Berkas Excel pairing kosong atau berukuran 0 byte.'],
+      };
+    }
+
+    const workbook = XLSX.read(bytes, { type: 'array' });
+    if (workbook.SheetNames.length === 0) {
+      return {
+        pairings: [],
+        detectedRounds: [],
+        errors: ['Berkas Excel tidak memiliki lembar kerja (worksheet).'],
+      };
+    }
+
+    if (targetRound !== undefined) {
+      const matchingSheet =
+        workbook.SheetNames.find(
+          (name) => extractRoundFromSheetName(name) === targetRound
+        ) ??
+        workbook.SheetNames.find((name) =>
+          /pairing|babak|round|pertandingan/i.test(name)
+        ) ??
+        workbook.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(
+        workbook.Sheets[matchingSheet],
+        { header: 1, raw: true, defval: '' }
+      );
+      return parsePairingsMatrix(rows, targetRound, targetRound);
+    }
+
+    const roundNamedSheets = workbook.SheetNames.filter(
+      (name) => extractRoundFromSheetName(name) !== undefined
+    );
+
+    if (roundNamedSheets.length > 1) {
+      const allPairings: RoundPairing[] = [];
+      const allErrors: string[] = [];
+      roundNamedSheets.forEach((sheetName) => {
+        const sheetRound = extractRoundFromSheetName(sheetName) ?? 1;
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(
+          workbook.Sheets[sheetName],
+          { header: 1, raw: true, defval: '' }
+        );
+        const res = parsePairingsMatrix(rows, sheetRound);
+        allPairings.push(...res.pairings);
+        res.errors.forEach((err) => allErrors.push(`[${sheetName}] ${err}`));
+      });
+      allPairings.sort((a, b) =>
+        a.round !== b.round ? a.round - b.round : a.board - b.board
+      );
+      return {
+        pairings: allPairings,
+        detectedRounds: Array.from(new Set(allPairings.map((p) => p.round))).sort(
+          (a, b) => a - b
+        ),
+        errors: allErrors,
+      };
+    }
+
+    const preferredSheetName =
+      workbook.SheetNames.find((name) =>
+        /pairing|babak|round|pertandingan/i.test(name)
+      ) ?? workbook.SheetNames[0];
+    const sheetRows = XLSX.utils.sheet_to_json<unknown[]>(
+      workbook.Sheets[preferredSheetName],
+      { header: 1, raw: true, defval: '' }
+    );
+    const inferredRound = extractRoundFromSheetName(preferredSheetName) ?? 1;
+    return parsePairingsMatrix(sheetRows, inferredRound);
+  } catch {
+    return {
+      pairings: [],
+      detectedRounds: [],
+      errors: [
+        'Berkas Excel pairing (.xls / .xlsx) tidak dapat dibaca. Pastikan format file valid.',
+      ],
+    };
+  }
+}
+
+export function mergeRoundPairings(
+  existingPairings: RoundPairing[],
+  incomingPairings: RoundPairing[],
+  roundsToReplace?: number[]
+): RoundPairing[] {
+  const replaceSet = new Set(
+    roundsToReplace && roundsToReplace.length > 0
+      ? roundsToReplace
+      : incomingPairings.map((p) => p.round)
+  );
+  const kept = existingPairings.filter((p) => !replaceSet.has(p.round));
+  return [...kept, ...incomingPairings].sort((a, b) =>
+    a.round !== b.round ? a.round - b.round : a.board - b.board
+  );
+}
+
+export function generateSamplePairingsExcelBytes(roundNumber = 1): Uint8Array {
+  const aoa = [
+    [
+      'Babak',
+      'Meja',
+      'S.No. Putih',
+      'Putih',
+      'Poin Putih',
+      'Hasil',
+      'Poin Hitam',
+      'Hitam',
+      'S.No. Hitam',
+    ],
+    [
+      roundNumber,
+      1,
+      1,
+      'Godfrid Harry Mollyson Siregar, NM',
+      '0',
+      '1 - 0',
+      '0',
+      'Sahat Sitanggang, NM',
+      2,
+    ],
+    [
+      roundNumber,
+      2,
+      3,
+      'Nurdin Simanjuntak, NM',
+      '0',
+      '½ - ½',
+      '0',
+      'Suhandri, PM',
+      4,
+    ],
+    [
+      roundNumber,
+      3,
+      5,
+      'Jonathan Charmian Vivaldy',
+      '0',
+      '*',
+      '0',
+      'Jon Toni',
+      6,
+    ],
+  ];
+  const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, `Babak ${roundNumber}`);
+  const out = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  return new Uint8Array(out);
+}
+
 export interface BackupValidationResult {
   valid: boolean;
   data?: PortalData;
@@ -998,16 +1477,32 @@ export function buildAthleteDetailProfile(
   };
 }
 
-export function buildInitialRankings(standings: StandingEntry[]): StandingEntry[] {
-  return [...standings].sort((a, b) => {
-    const seedA = a.sNo ?? a.rank;
-    const seedB = b.sNo ?? b.rank;
-    if (seedA !== seedB) return seedA - seedB;
-    const ratingA = typeof a.rating === 'number' ? a.rating : 0;
-    const ratingB = typeof b.rating === 'number' ? b.rating : 0;
-    if (ratingA !== ratingB) return ratingB - ratingA;
-    return a.name.localeCompare(b.name, 'id');
-  });
+export function buildInitialRankings(
+  standings: StandingEntry[],
+  customInitialRankings?: InitialRankEntry[]
+): InitialRankEntry[] {
+  if (customInitialRankings && customInitialRankings.length > 0) {
+    return [...customInitialRankings].sort((a, b) => a.sNo - b.sNo);
+  }
+  return [...standings]
+    .sort((a, b) => {
+      const seedA = a.sNo ?? a.rank;
+      const seedB = b.sNo ?? b.rank;
+      if (seedA !== seedB) return seedA - seedB;
+      const ratingA = typeof a.rating === 'number' ? a.rating : 0;
+      const ratingB = typeof b.rating === 'number' ? b.rating : 0;
+      if (ratingA !== ratingB) return ratingB - ratingA;
+      return a.name.localeCompare(b.name, 'id');
+    })
+    .map((row, idx) => ({
+      sNo: row.sNo ?? idx + 1,
+      name: row.name,
+      rating: row.rating,
+      fed: row.fed,
+      category: row.category,
+      title: row.title,
+      club: row.club,
+    }));
 }
 
 export function filterPairingsByRound(

@@ -7,6 +7,7 @@ import type {
   StandingEntry,
   Tournament,
 } from '../types/chess';
+import { sortInitialRankings } from '../utils/portalLogic';
 
 export const HERO_IMAGE_URL = './assets/aistudio/IMG_20260919_105146_a1507b0b.jpg';
 export const NEWS_JUNIOR_IMAGE_URL = './src/assets/images/news_pembinaan_junior_1795156766513.jpg';
@@ -776,7 +777,18 @@ function buildSeedAthletes(
 
   initialRankings.forEach((entry) => {
     const key = normalizeSeedAthleteName(entry.name);
-    if (!key || seen.has(key)) return;
+    if (!key) return;
+    const { district, club } = mapClubCityToDistrictAndClub(entry.clubCity);
+    if (seen.has(key)) {
+      const existing = extras.find(
+        (ath) => normalizeSeedAthleteName(ath.fullName) === key
+      );
+      if (existing && existing.club === '-' && entry.clubCity) {
+        existing.district = district;
+        if (club !== '-') existing.club = club;
+      }
+      return;
+    }
     seen.add(key);
 
     const isPutri = String(entry.gender ?? '').trim().toLowerCase() === 'putri';
@@ -786,7 +798,6 @@ function buildSeedAthletes(
       typeof rawRating === 'number' && Number.isFinite(rawRating) && rawRating > 0
         ? rawRating
         : 0;
-    const { district, club } = mapClubCityToDistrictAndClub(entry.clubCity);
 
     extras.push({
       id: `ath-dc-${String(entry.sNo).padStart(3, '0')}`,
@@ -965,15 +976,28 @@ export const FIRDAUS_CUP_INITIAL_RANKINGS: InitialRankEntry[] = [
   { sNo: 148, name: 'Zulkifli Ritonga', gender: 'Putra', nationalRating: '-', internationalRating: '-', fed: 'INA', clubCity: 'Batam Kota' },
 ];
 
-export const DARWIN_CUP_INITIAL_RANKINGS: InitialRankEntry[] =
-  FIRDAUS_CUP_INITIAL_RANKINGS.map((row) => ({
-    sNo: row.sNo,
-    name: row.name,
-    gender: row.gender,
-    rating: row.nationalRating,
-    fed: row.fed,
-    clubCity: row.clubCity,
-  }));
+export const DARWIN_CUP_INITIAL_RANKINGS: InitialRankEntry[] = sortInitialRankings(
+  FIRDAUS_CUP_INITIAL_RANKINGS.map((row) => {
+    if (normalizeSeedAthleteName(row.name) === 'tagor tambunan') {
+      return {
+        sNo: row.sNo,
+        name: 'Wahyu Rizky Pratama',
+        gender: 'Putra',
+        rating: '-',
+        fed: 'INA',
+        clubCity: 'Bengkong',
+      };
+    }
+    return {
+      sNo: row.sNo,
+      name: row.name,
+      gender: row.gender,
+      rating: row.nationalRating,
+      fed: row.fed,
+      clubCity: row.clubCity,
+    };
+  })
+);
 
 export const SEED_ATHLETES: Athlete[] = buildSeedAthletes(
   BASE_SEED_ATHLETES,
@@ -1032,7 +1056,7 @@ export const SEED_NEWS: NewsArticle[] = [];
 
 export const SEED_PORTAL_DATA: PortalData = {
   version: '3.0',
-  updatedAt: '2026-11-27T06:00:00.000Z',
+  updatedAt: '2026-11-27T11:50:00.000Z',
   athletes: SEED_ATHLETES,
   tournaments: SEED_TOURNAMENTS,
   news: SEED_NEWS,

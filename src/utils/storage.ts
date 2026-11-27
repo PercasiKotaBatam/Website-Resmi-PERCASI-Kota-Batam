@@ -95,10 +95,17 @@ export function migratePortalData(data: PortalData): PortalData {
         t.id === 'trn-darwin-cup-2026' || /\bdarwin\s*cup/i.test(t.name);
 
       if (isDarwinCup) {
+        const hasLegacyTagorSeed =
+          Array.isArray(t.initialRankings) &&
+          t.initialRankings.length === DARWIN_CUP_INITIAL_RANKINGS.length &&
+          t.initialRankings.some(
+            (row) => normalizeAthleteName(row.name) === 'tagor tambunan'
+          );
         const needsDarwinInitialUpgrade =
           !Array.isArray(t.initialRankings) ||
           t.initialRankings.length < DARWIN_CUP_INITIAL_RANKINGS.length ||
-          t.initialRankings.some((row) => row.gender === undefined && row.clubCity === undefined);
+          t.initialRankings.some((row) => row.gender === undefined && row.clubCity === undefined) ||
+          hasLegacyTagorSeed;
         return {
           ...t,
           participantsCount: Math.max(

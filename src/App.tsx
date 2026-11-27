@@ -245,6 +245,17 @@ export default function App() {
     setSelectedTournament(tournament);
   };
 
+  const handleUpdateTournamentInPlace = (tournament: Tournament) => {
+    const nextData: PortalData = {
+      ...portalData,
+      tournaments: portalData.tournaments.map((t) =>
+        t.id === tournament.id ? tournament : t
+      ),
+    };
+    commitPortalChange(nextData);
+    setSelectedTournament(tournament);
+  };
+
   const handleRestoreData = (restored: PortalData) => {
     commitPortalChange(migratePortalData(restored));
   };
@@ -370,6 +381,7 @@ export default function App() {
           handleOpenAthletePage(name, tournamentId)
         }
         onEditTournament={handleOpenEditTournament}
+        onUpdateTournament={handleUpdateTournamentInPlace}
       />
 
       <NewsDetailModal

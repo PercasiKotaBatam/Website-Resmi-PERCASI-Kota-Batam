@@ -12,8 +12,14 @@ const PORTAL_DATA_FILE = path.resolve(__dirname, 'public', 'data', 'portal-data.
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
-const authService = createAdminAuthService();
+const authService = createAdminAuthService({
+  storageFilePath: path.resolve(__dirname, '.data', 'admin-auth.json'),
+});
 
+app.use('/api/admin', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 app.use('/api/admin', express.json({ limit: '64kb' }));
 
 // Simple in-memory rate limit for auth attempts per IP

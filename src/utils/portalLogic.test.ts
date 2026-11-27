@@ -23,6 +23,7 @@ import {
   parseStandingsJson,
   pickAuthoritativePortalData,
   resolvePublicAssetUrl,
+  sortInitialRankings,
   sortRatings,
   validatePortalBackup,
 } from './portalLogic';
@@ -418,6 +419,50 @@ test('Firdaus Cup 2026 and Darwin Cup 2026 exist in seed with 148-player initial
   assert.equal(darwinInitial[5]?.name, 'Jonathan Charmian Vivaldy');
   assert.equal(darwinInitial[5]?.rating, 1896);
   assert.equal(darwinInitial[5]?.internationalRating, undefined);
+  assert.equal(darwinInitial[8]?.rating, 1760);
+  assert.equal(
+    darwinInitial.some((row) => normalizeAthleteName(row.name) === 'tagor tambunan'),
+    false
+  );
+  const wahyuEntry = darwinInitial.find(
+    (row) => normalizeAthleteName(row.name) === 'wahyu rizky pratama'
+  );
+  assert.ok(wahyuEntry);
+  assert.equal(wahyuEntry.clubCity, 'Bengkong');
+  assert.equal(wahyuEntry.sNo, 141);
+
+  const darwinRatingsOnly = darwinInitial.slice(0, 9).map((r) => Number(r.rating));
+  assert.deepEqual(darwinRatingsOnly, [2243, 2033, 2026, 1992, 1960, 1896, 1892, 1880, 1760]);
+
+  const unratedNames = darwinInitial.slice(9).map((r) => r.name);
+  for (let i = 1; i < unratedNames.length; i += 1) {
+    assert.ok(
+      unratedNames[i - 1]!.localeCompare(unratedNames[i]!, 'id', { sensitivity: 'base' }) <= 0,
+      `Expected alphabetical order for unrated players: ${unratedNames[i - 1]} before ${unratedNames[i]}`
+    );
+  }
+
+  const wahyuSeedProfile = SEED_ATHLETES.find(
+    (ath) => normalizeAthleteName(ath.fullName) === 'wahyu rizky pratama'
+  );
+  assert.ok(wahyuSeedProfile);
+  assert.equal(wahyuSeedProfile.district, 'Bengkong');
+
+  const customSorted = sortInitialRankings([
+    { sNo: 9, name: 'Zebra', rating: '-', clubCity: 'Nongsa' },
+    { sNo: 3, name: 'Beta', rating: 1900, clubCity: 'Sekupang' },
+    { sNo: 7, name: 'Alpha', rating: '-', clubCity: 'Bengkong' },
+    { sNo: 1, name: 'Gamma', rating: 2050, clubCity: 'Sagulung' },
+  ]);
+  assert.deepEqual(
+    customSorted.map((row) => ({ sNo: row.sNo, name: row.name })),
+    [
+      { sNo: 1, name: 'Gamma' },
+      { sNo: 2, name: 'Beta' },
+      { sNo: 3, name: 'Alpha' },
+      { sNo: 4, name: 'Zebra' },
+    ]
+  );
 
   const fallbackInitial = buildInitialRankings(FIRDAUS_CUP_STANDINGS);
   assert.equal(fallbackInitial.length, 92);
@@ -556,6 +601,58 @@ test('migratePortalData upgrades cached Firdaus Cup and Darwin Cup initialRankin
   assert.equal(migrated.tournaments[1]?.venue, 'Hotel Harmoni Batam');
   assert.equal(migrated.tournaments[1]?.participantsCount, 148);
   assert.equal(migrated.tournaments[1]?.initialRankings?.length, 148);
+
+  const legacyTagorCached = {
+    ...SEED_PORTAL_DATA,
+    tournaments: SEED_PORTAL_DATA.tournaments.map((t) =>
+      t.id === 'trn-darwin-cup-2026'
+        ? {
+            ...t,
+            initialRankings: DARWIN_CUP_INITIAL_RANKINGS.map((row) =>
+              normalizeAthleteName(row.name) === 'wahyu rizky pratama'
+                ? { ...row, name: 'Tagor Tambunan', clubCity: 'Sekupang' }
+                : row
+            ),
+          }
+        : t
+    ),
+  };
+  const upgradedFromTagor = migratePortalData(legacyTagorCached);
+  assert.equal(
+    upgradedFromTagor.tournaments[1]?.initialRankings?.some(
+      (r) => normalizeAthleteName(r.name) === 'tagor tambunan'
+    ),
+    false
+  );
+  assert.equal(
+    upgradedFromTagor.tournaments[1]?.initialRankings?.find(
+      (r) => normalizeAthleteName(r.name) === 'wahyu rizky pratama'
+    )?.clubCity,
+    'Bengkong'
+  );
+
+  const adminEditedDarwin = {
+    ...SEED_PORTAL_DATA,
+    tournaments: SEED_PORTAL_DATA.tournaments.map((t) =>
+      t.id === 'trn-darwin-cup-2026'
+        ? {
+            ...t,
+            initialRankings: [
+              ...(t.initialRankings ?? []).slice(0, 147),
+              {
+                ...DARWIN_CUP_INITIAL_RANKINGS[147]!,
+                clubCity: 'Nongsa Edit',
+              },
+            ],
+          }
+        : t
+    ),
+  };
+  const preservedAdminDarwin = migratePortalData(adminEditedDarwin);
+  assert.equal(
+    preservedAdminDarwin.tournaments[1]?.initialRankings?.[147]?.clubCity,
+    'Nongsa Edit'
+  );
 });
 
 test('parsePairingsExcelBuffer and mergeRoundPairings parse .xlsx/.xls Swiss-Manager round pairings and merge by round', () => {

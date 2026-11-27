@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export interface AdminConfigStatus {
   configured: boolean;
@@ -44,11 +46,66 @@ function safeStringEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(hashA, hashB);
 }
 
+export interface AdminAuthServiceOptions {
+  getEnv?: () => NodeJS.ProcessEnv;
+  storageFilePath?: string;
+}
+
+function readStoredCredential(filePath: string | undefined): StoredAdminCredential | null {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw) as Partial<StoredAdminCredential>;
+    if (
+      typeof parsed.username === 'string' &&
+      parsed.username.trim().length >= 3 &&
+      typeof parsed.salt === 'string' &&
+      parsed.salt.length > 0 &&
+      typeof parsed.hash === 'string' &&
+      parsed.hash.length > 0
+    ) {
+      return {
+        username: parsed.username.trim(),
+        salt: parsed.salt,
+        hash: parsed.hash,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredCredential(
+  filePath: string | undefined,
+  credential: StoredAdminCredential
+): void {
+  if (!filePath) return;
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const tempFile = `${filePath}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(credential, null, 2), {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+    fs.renameSync(tempFile, filePath);
+  } catch {
+    // Keep in-memory credential if disk persistence fails
+  }
+}
+
 export function createAdminAuthService(
-  getEnv: () => NodeJS.ProcessEnv = () => process.env
+  optionsOrGetEnv: (() => NodeJS.ProcessEnv) | AdminAuthServiceOptions = {}
 ): AdminAuthService {
+  const options: AdminAuthServiceOptions =
+    typeof optionsOrGetEnv === 'function'
+      ? { getEnv: optionsOrGetEnv }
+      : optionsOrGetEnv;
+  const getEnv = options.getEnv ?? (() => process.env);
+  const storageFilePath = options.storageFilePath;
+
   const runtimeSecret = getEnv().ADMIN_SESSION_SECRET?.trim() || crypto.randomBytes(32).toString('hex');
-  let claimedCredential: StoredAdminCredential | null = null;
+  let claimedCredential: StoredAdminCredential | null = readStoredCredential(storageFilePath);
   const revokedTokens = new Map<string, number>();
 
   const getEnvCredentials = (): { username: string; password: string } | null => {
@@ -161,6 +218,7 @@ export function createAdminAuthService(
       salt,
       hash: derived,
     };
+    writeStoredCredential(storageFilePath, claimedCredential);
 
     const token = issueToken(cleanUser);
     return { ok: true, token, username: cleanUser };

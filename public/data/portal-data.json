@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "updatedAt": "2026-11-27T06:00:00.000Z",
+  "updatedAt": "2026-11-27T11:50:00.000Z",
   "athletes": [
     {
       "id": "ath-01",
@@ -260,7 +260,7 @@
       "title": "Non-Gelar",
       "category": "Senior Putra",
       "gender": "Putra",
-      "club": "-",
+      "club": "Pokemonster",
       "district": "Batam Kota",
       "ratings": {
         "standard": 1896,
@@ -278,7 +278,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Sekupang",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -294,7 +294,7 @@
       "title": "Non-Gelar",
       "category": "Junior U-18",
       "gender": "Putra",
-      "club": "-",
+      "club": "Pokemonster",
       "district": "Batam Kota",
       "ratings": {
         "standard": 0,
@@ -499,7 +499,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Batu Aji",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -601,7 +601,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Sagulung",
       "ratings": {
         "standard": 1700,
         "rapid": 1700,
@@ -618,7 +618,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Sagulung",
       "ratings": {
         "standard": 1777,
         "rapid": 1777,
@@ -651,7 +651,7 @@
       "title": "Non-Gelar",
       "category": "Junior U-18",
       "gender": "Putra",
-      "club": "-",
+      "club": "Pokemonster",
       "district": "Batam Kota",
       "ratings": {
         "standard": 0,
@@ -702,7 +702,7 @@
       "title": "Non-Gelar",
       "category": "Junior U-18",
       "gender": "Putra",
-      "club": "-",
+      "club": "Pokemonster",
       "district": "Batam Kota",
       "ratings": {
         "standard": 0,
@@ -720,7 +720,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Sagulung",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -771,7 +771,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Sagulung",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -804,7 +804,7 @@
       "title": "Non-Gelar",
       "category": "Senior Putra",
       "gender": "Putra",
-      "club": "-",
+      "club": "SSC",
       "district": "Batam Kota",
       "ratings": {
         "standard": 0,
@@ -822,7 +822,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Sagulung",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -1128,7 +1128,7 @@
       "category": "Junior U-18",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Bengkong",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -1179,7 +1179,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Nongsa",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -1246,7 +1246,7 @@
       "title": "Non-Gelar",
       "category": "Senior Putra",
       "gender": "Putra",
-      "club": "-",
+      "club": "Kepri - Tanjung Pinang",
       "district": "Batam Kota",
       "ratings": {
         "standard": 0,
@@ -1399,7 +1399,7 @@
       "title": "Non-Gelar",
       "category": "Senior Putra",
       "gender": "Putra",
-      "club": "-",
+      "club": "KOCAK",
       "district": "Batam Kota",
       "ratings": {
         "standard": 0,
@@ -1416,7 +1416,7 @@
       "title": "Non-Gelar",
       "category": "Senior Putra",
       "gender": "Putra",
-      "club": "-",
+      "club": "Kepri - Bintan",
       "district": "Batam Kota",
       "ratings": {
         "standard": 0,
@@ -1621,7 +1621,7 @@
       "category": "Senior Putra",
       "gender": "Putra",
       "club": "-",
-      "district": "Batam Kota",
+      "district": "Sagulung",
       "ratings": {
         "standard": 0,
         "rapid": 0,
@@ -3418,23 +3418,6 @@
     },
     {
       "id": "ath-dc-134",
-      "fullName": "Tagor Tambunan",
-      "title": "Non-Gelar",
-      "category": "Senior Putra",
-      "gender": "Putra",
-      "club": "-",
-      "district": "Sekupang",
-      "ratings": {
-        "standard": 0,
-        "rapid": 0,
-        "blitz": 0
-      },
-      "bio": "Atlet catur terdaftar Pengkot PERCASI Kota Batam (Peserta Darwin Cup 2026).",
-      "federationStatus": "Atlet",
-      "tournamentHistory": []
-    },
-    {
-      "id": "ath-dc-135",
       "fullName": "Teguh Roy Bowo",
       "title": "Non-Gelar",
       "category": "Senior Putra",
@@ -3451,7 +3434,7 @@
       "tournamentHistory": []
     },
     {
-      "id": "ath-dc-136",
+      "id": "ath-dc-135",
       "fullName": "Tio M. Siahaan",
       "title": "Non-Gelar",
       "category": "Senior Putra",
@@ -3468,7 +3451,7 @@
       "tournamentHistory": []
     },
     {
-      "id": "ath-dc-137",
+      "id": "ath-dc-136",
       "fullName": "Tommy Z.",
       "title": "Non-Gelar",
       "category": "Senior Putra",
@@ -3485,7 +3468,7 @@
       "tournamentHistory": []
     },
     {
-      "id": "ath-dc-138",
+      "id": "ath-dc-137",
       "fullName": "Toni Candra",
       "title": "Non-Gelar",
       "category": "Senior Putra",
@@ -3502,7 +3485,7 @@
       "tournamentHistory": []
     },
     {
-      "id": "ath-dc-139",
+      "id": "ath-dc-138",
       "fullName": "Tua Marojahan Simbolon",
       "title": "Non-Gelar",
       "category": "Senior Putra",
@@ -3519,7 +3502,7 @@
       "tournamentHistory": []
     },
     {
-      "id": "ath-dc-141",
+      "id": "ath-dc-140",
       "fullName": "Veri Antoni",
       "title": "Non-Gelar",
       "category": "Senior Putra",
@@ -11271,14 +11254,6 @@
         },
         {
           "sNo": 134,
-          "name": "Tagor Tambunan",
-          "gender": "Putra",
-          "rating": "-",
-          "fed": "INA",
-          "clubCity": "Sekupang"
-        },
-        {
-          "sNo": 135,
           "name": "Teguh Roy Bowo",
           "gender": "Putra",
           "rating": "-",
@@ -11286,7 +11261,7 @@
           "clubCity": "Sei Beduk"
         },
         {
-          "sNo": 136,
+          "sNo": 135,
           "name": "Tio M. Siahaan",
           "gender": "Putra",
           "rating": "-",
@@ -11294,7 +11269,7 @@
           "clubCity": "SSC"
         },
         {
-          "sNo": 137,
+          "sNo": 136,
           "name": "Tommy Z.",
           "gender": "Putra",
           "rating": "-",
@@ -11302,7 +11277,7 @@
           "clubCity": "SSC"
         },
         {
-          "sNo": 138,
+          "sNo": 137,
           "name": "Toni Candra",
           "gender": "Putra",
           "rating": "-",
@@ -11310,7 +11285,7 @@
           "clubCity": "Sagulung"
         },
         {
-          "sNo": 139,
+          "sNo": 138,
           "name": "Tua Marojahan Simbolon",
           "gender": "Putra",
           "rating": "-",
@@ -11318,7 +11293,7 @@
           "clubCity": "Sagulung"
         },
         {
-          "sNo": 140,
+          "sNo": 139,
           "name": "Ujang Suhendrik",
           "gender": "Putra",
           "rating": "-",
@@ -11326,12 +11301,20 @@
           "clubCity": "Nongsa"
         },
         {
-          "sNo": 141,
+          "sNo": 140,
           "name": "Veri Antoni",
           "gender": "Putra",
           "rating": "-",
           "fed": "INA",
           "clubCity": "Lubuk Baja"
+        },
+        {
+          "sNo": 141,
+          "name": "Wahyu Rizky Pratama",
+          "gender": "Putra",
+          "rating": "-",
+          "fed": "INA",
+          "clubCity": "Bengkong"
         },
         {
           "sNo": 142,

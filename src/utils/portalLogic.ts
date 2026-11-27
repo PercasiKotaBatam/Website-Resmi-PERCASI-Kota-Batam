@@ -1484,6 +1484,55 @@ export function buildAthleteDetailProfile(
   };
 }
 
+export function parseInitialRankNumericRating(
+  value: number | string | undefined
+): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '-') return 0;
+    const parsed = Number.parseInt(trimmed.replace(/[^\d]/g, ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }
+  return 0;
+}
+
+export function sortInitialRankings(
+  entries: InitialRankEntry[]
+): InitialRankEntry[] {
+  return [...entries]
+    .sort((a, b) => {
+      const ratingA = Math.max(
+        parseInitialRankNumericRating(a.rating),
+        parseInitialRankNumericRating(a.nationalRating),
+        parseInitialRankNumericRating(a.internationalRating)
+      );
+      const ratingB = Math.max(
+        parseInitialRankNumericRating(b.rating),
+        parseInitialRankNumericRating(b.nationalRating),
+        parseInitialRankNumericRating(b.internationalRating)
+      );
+      if (ratingA > 0 && ratingB > 0) {
+        if (ratingA !== ratingB) return ratingB - ratingA;
+      } else if (ratingA > 0) {
+        return -1;
+      } else if (ratingB > 0) {
+        return 1;
+      }
+      const nameCmp = a.name
+        .trim()
+        .localeCompare(b.name.trim(), 'id', { sensitivity: 'base' });
+      if (nameCmp !== 0) return nameCmp;
+      return (a.sNo ?? 0) - (b.sNo ?? 0);
+    })
+    .map((entry, idx) => ({
+      ...entry,
+      sNo: idx + 1,
+    }));
+}
+
 export function buildInitialRankings(
   standings: StandingEntry[],
   customInitialRankings?: InitialRankEntry[]

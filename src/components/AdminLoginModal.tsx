@@ -44,7 +44,7 @@ export function AdminLoginModal({
     setShowPassword(false);
     setStatusLoading(true);
 
-    fetch('/api/admin/status')
+    fetch('/api/admin/status', { cache: 'no-store' })
       .then(async (res) => {
         const contentType = res.headers.get('content-type') || '';
         if (!res.ok || !contentType.includes('application/json')) {
@@ -158,7 +158,7 @@ export function AdminLoginModal({
       setConfirmPassword('');
       onClose();
     } catch {
-      setError('Terjadi kesalahan saat memverifikasi akun admin.');
+      setError('Gagal terhubung ke layanan autentikasi admin. Periksa koneksi lalu coba kembali.');
     } finally {
       setSubmitting(false);
     }
@@ -229,7 +229,7 @@ export function AdminLoginModal({
                 <p className="mt-1">
                   Situs statis tidak menjalankan server backend, sehingga akun admin
                   disimpan terenkripsi lokal di peramban ini. Perubahan data dapat
-                  diekspor lewat tombol <strong>Cadangkan &amp; Ekspor</strong>{' '}
+                  diekspor lewat tombol <strong>Backup &amp; Restore Data</strong>{' '}
                   lalu diperbarui ke berkas{' '}
                   <code className="font-mono">public/data/portal-data.json</code>.
                 </p>

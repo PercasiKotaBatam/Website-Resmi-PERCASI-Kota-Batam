@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createAdminAuthService } from './serverAuth.ts';
 
 test('first-run setup claims admin credential once and issues valid Bearer token', () => {
@@ -58,4 +61,33 @@ test('environment credentials take precedence and lock first-run setup', () => {
 
   const valid = auth.login('configured_user', 'configured_password_123');
   assert.equal(valid.ok, true);
+});
+
+test('claimed admin hash persists on disk across service restarts', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'percasi-auth-'));
+  const storePath = path.join(tmpDir, 'admin-auth.json');
+  try {
+    const firstBoot = createAdminAuthService({
+      getEnv: () => ({}),
+      storageFilePath: storePath,
+    });
+    assert.equal(firstBoot.getStatus().configured, false);
+    const claimed = firstBoot.setupFirstAdmin('PengurusBatam', 'BatamCatur2026!');
+    assert.equal(claimed.ok, true);
+
+    // Ensure plaintext password is never saved on disk
+    const savedRaw = fs.readFileSync(storePath, 'utf8');
+    assert.equal(savedRaw.includes('BatamCatur2026!'), false);
+
+    // Simulate server restart
+    const secondBoot = createAdminAuthService({
+      getEnv: () => ({}),
+      storageFilePath: storePath,
+    });
+    assert.deepEqual(secondBoot.getStatus(), { configured: true, source: 'claimed' });
+    const loginOk = secondBoot.login('PengurusBatam', 'BatamCatur2026!');
+    assert.equal(loginOk.ok, true);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });

@@ -24,6 +24,7 @@ import type {
   Tournament,
 } from './types/chess';
 import { pickAuthoritativePortalData } from './utils/portalLogic';
+import { isStaticAdminToken } from './utils/staticAdminAuth';
 import {
   fetchPublishedPortalData,
   loadPortalData,
@@ -92,7 +93,7 @@ export default function App() {
     const saved = savePortalData(nextData, markLocalEdited);
     setPortalData(saved);
     const activeToken = tokenOverride !== undefined ? tokenOverride : adminToken;
-    if (activeToken) {
+    if (activeToken && !isStaticAdminToken(activeToken)) {
       setSyncStatus('syncing');
       void syncPortalDataToServer(saved, activeToken).then((res) => {
         setSyncStatus(res.ok ? 'synced' : 'local-only');
@@ -184,7 +185,7 @@ export default function App() {
     setUploadTournamentOpen(false);
     setEditingTournament(null);
     setBackupOpen(false);
-    if (token) {
+    if (token && !isStaticAdminToken(token)) {
       void fetch('/api/admin/logout', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -204,6 +205,10 @@ export default function App() {
 
   const handleAdminAuthSuccess = (token: string) => {
     setAdminToken(token);
+    if (isStaticAdminToken(token)) {
+      setSyncStatus('local-only');
+      return;
+    }
     const { localEdited } = readLocalPortalSnapshot();
     if (localEdited) {
       setSyncStatus('syncing');
@@ -247,11 +252,13 @@ export default function App() {
   const handleResetSeed = () => {
     const fresh = resetPortalData();
     setPortalData(fresh);
-    if (adminToken) {
+    if (adminToken && !isStaticAdminToken(adminToken)) {
       setSyncStatus('syncing');
       void syncPortalDataToServer(fresh, adminToken).then((res) => {
         setSyncStatus(res.ok ? 'synced' : 'local-only');
       });
+    } else if (isStaticAdminToken(adminToken)) {
+      setSyncStatus('local-only');
     } else {
       setSyncStatus('idle');
     }

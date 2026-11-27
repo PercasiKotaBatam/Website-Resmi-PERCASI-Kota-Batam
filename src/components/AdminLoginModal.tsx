@@ -1,5 +1,11 @@
-import { Eye, EyeOff, KeyRound, ShieldCheck, X } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import {
+  clearStaticAdmin,
+  hasStaticAdminClaimed,
+  setupStaticAdmin,
+  verifyStaticAdmin,
+} from '../utils/staticAdminAuth';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -12,12 +18,15 @@ interface AdminStatusResponse {
   source: 'env' | 'claimed' | 'unconfigured';
 }
 
+type AuthBackendMode = 'server' | 'static';
+
 export function AdminLoginModal({
   isOpen,
   onClose,
   onSuccess,
 }: AdminLoginModalProps) {
   const [statusLoading, setStatusLoading] = useState(true);
+  const [backendMode, setBackendMode] = useState<AuthBackendMode>('server');
   const [configured, setConfigured] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -37,28 +46,22 @@ export function AdminLoginModal({
 
     fetch('/api/admin/status')
       .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(
-            res.status === 404
-              ? 'Layanan autentikasi Mode Admin memerlukan server backend aktif (tidak tersedia pada hosting statis seperti GitHub Pages).'
-              : 'Gagal memeriksa status autentikasi admin.'
-          );
+        const contentType = res.headers.get('content-type') || '';
+        if (!res.ok || !contentType.includes('application/json')) {
+          throw new Error('STATIC_HOST');
         }
         return (await res.json()) as AdminStatusResponse;
       })
       .then((data) => {
         if (!cancelled) {
+          setBackendMode('server');
           setConfigured(Boolean(data.configured));
         }
       })
-      .catch((err: unknown) => {
+      .catch(() => {
         if (!cancelled) {
-          setConfigured(true);
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Tidak dapat terhubung ke layanan autentikasi admin.'
-          );
+          setBackendMode('static');
+          setConfigured(hasStaticAdminClaimed());
         }
       })
       .finally(() => {
@@ -81,6 +84,15 @@ export function AdminLoginModal({
 
   if (!isOpen) return null;
 
+  const handleResetStaticAdmin = () => {
+    clearStaticAdmin();
+    setConfigured(false);
+    setUsername('');
+    setPassword('');
+    setConfirmPassword('');
+    setError('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -98,12 +110,36 @@ export function AdminLoginModal({
 
     setSubmitting(true);
     try {
+      if (backendMode === 'static') {
+        const result = configured
+          ? await verifyStaticAdmin(cleanUsername, password)
+          : await setupStaticAdmin(cleanUsername, password);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        onSuccess(result.token, result.username);
+        setUsername('');
+        setPassword('');
+        setConfirmPassword('');
+        onClose();
+        return;
+      }
+
       const endpoint = configured ? '/api/admin/login' : '/api/admin/setup';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: cleanUsername, password }),
       });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setBackendMode('static');
+        setConfigured(hasStaticAdminClaimed());
+        setError('Server backend tidak tersedia. Dialihkan ke Mode Admin Lokal.');
+        return;
+      }
 
       const payload = (await res.json()) as {
         token?: string;
@@ -122,11 +158,13 @@ export function AdminLoginModal({
       setConfirmPassword('');
       onClose();
     } catch {
-      setError('Terjadi kesalahan jaringan saat memverifikasi akun admin.');
+      setError('Terjadi kesalahan saat memverifikasi akun admin.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const isStatic = backendMode === 'static';
 
   return (
     <div
@@ -154,10 +192,18 @@ export function AdminLoginModal({
                 id="admin-login-title"
                 className="text-base font-extrabold text-[#0F2342]"
               >
-                {configured ? 'Masuk Mode Admin' : 'Aktivasi Akun Admin'}
+                {isStatic
+                  ? configured
+                    ? 'Masuk Mode Admin Lokal'
+                    : 'Aktivasi Mode Admin Lokal'
+                  : configured
+                    ? 'Masuk Mode Admin'
+                    : 'Aktivasi Akun Admin'}
               </h2>
               <p className="text-[11px] text-slate-500">
-                Otorisasi Pengurus PERCASI Kota Batam
+                {isStatic
+                  ? 'Mode Pengelolaan Peramban (Hosting Statis)'
+                  : 'Otorisasi Pengurus PERCASI Kota Batam'}
               </p>
             </div>
           </div>
@@ -177,7 +223,20 @@ export function AdminLoginModal({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 p-6">
-            {!configured && (
+            {isStatic && !configured && (
+              <div className="rounded-md border border-sky-200 bg-sky-50 px-3.5 py-3 text-xs leading-relaxed text-sky-950">
+                <p className="font-bold">Mode Admin Lokal (GitHub Pages)</p>
+                <p className="mt-1">
+                  Situs statis tidak menjalankan server backend, sehingga akun admin
+                  disimpan terenkripsi lokal di peramban ini. Perubahan data dapat
+                  diekspor lewat tombol <strong>Cadangkan &amp; Ekspor</strong>{' '}
+                  lalu diperbarui ke berkas{' '}
+                  <code className="font-mono">public/data/portal-data.json</code>.
+                </p>
+              </div>
+            )}
+
+            {!isStatic && !configured && (
               <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-950">
                 <p className="font-bold">Aktivasi Pertama Kali</p>
                 <p className="mt-1">
@@ -278,25 +337,40 @@ export function AdminLoginModal({
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex h-10 items-center rounded-md border border-slate-300 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="inline-flex h-10 items-center rounded-md bg-[#0F2342] px-5 text-xs font-bold text-white hover:bg-[#173360] disabled:opacity-60"
-              >
-                {submitting
-                  ? 'Memverifikasi...'
-                  : configured
-                    ? 'Masuk Mode Admin'
-                    : 'Aktifkan Mode Admin'}
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-200 pt-4">
+              {isStatic && configured ? (
+                <button
+                  type="button"
+                  onClick={handleResetStaticAdmin}
+                  className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-[#B91C1C]"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Atur Ulang Akun Lokal</span>
+                </button>
+              ) : (
+                <span />
+              )}
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex h-10 items-center rounded-md border border-slate-300 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex h-10 items-center rounded-md bg-[#0F2342] px-5 text-xs font-bold text-white hover:bg-[#173360] disabled:opacity-60"
+                >
+                  {submitting
+                    ? 'Memverifikasi...'
+                    : configured
+                      ? 'Masuk Mode Admin'
+                      : 'Aktifkan Mode Admin'}
+                </button>
+              </div>
             </div>
           </form>
         )}

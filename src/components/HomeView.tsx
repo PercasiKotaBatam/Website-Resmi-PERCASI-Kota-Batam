@@ -1,6 +1,6 @@
 import { ArrowRight, Calendar, MapPin, Search, Trophy, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { HERO_IMAGE_URL } from '../data/seedData';
+import heroOfficialPhoto from '../assets/images/hero_percasi_batam_official.jpg';
 import type {
   Athlete,
   NavSection,
@@ -8,7 +8,7 @@ import type {
   RatingCategory,
   Tournament,
 } from '../types/chess';
-import { getTopAthletes, resolvePublicAssetUrl } from '../utils/portalLogic';
+import { getTopAthletes } from '../utils/portalLogic';
 import { AthleteAvatar } from './AthleteAvatar';
 import { TitleBadge, TournamentStatusText } from './TitleBadge';
 
@@ -46,7 +46,15 @@ export function HomeView({
     [athletes, topTab]
   );
 
-  const spotlightTournament = tournaments[0];
+  const spotlightTournament = useMemo(
+    () =>
+      tournaments.find(
+        (t) =>
+          t.id === 'trn-darwin-cup-2026' ||
+          /darwin cup 2026/i.test(t.name)
+      ) ?? tournaments[0],
+    [tournaments]
+  );
 
   const quickSearchResults = useMemo(() => {
     const q = quickQuery.trim().toLowerCase();
@@ -104,7 +112,13 @@ export function HomeView({
                         {spotlightTournament.name}
                       </h2>
                       <p className="mt-0.5 text-xs text-slate-300">
-                        {spotlightTournament.timeControlCategory} {spotlightTournament.timeControlDetail}, Sistem Swiss {spotlightTournament.rounds} babak
+                        {spotlightTournament.timeControlCategory}{' '}
+                        {spotlightTournament.timeControlDetail}
+                        {spotlightTournament.timeControlDetail
+                          .toLowerCase()
+                          .includes('swiss')
+                          ? ''
+                          : `, Sistem Swiss ${spotlightTournament.rounds} babak`}
                       </p>
                     </div>
                     <button
@@ -112,7 +126,11 @@ export function HomeView({
                       onClick={() => onSelectTournament(spotlightTournament)}
                       className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md bg-white px-4 text-xs font-bold text-[#0F2342] transition-colors hover:bg-slate-100 whitespace-nowrap shrink-0"
                     >
-                      <span>Lihat Klasemen</span>
+                      <span>
+                        {spotlightTournament.standings.length > 0
+                          ? 'Lihat Klasemen'
+                          : 'Lihat Peringkat Awal'}
+                      </span>
                       <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
@@ -244,9 +262,8 @@ export function HomeView({
           <div className="relative overflow-hidden rounded-lg border border-white/15 bg-[#09172E] lg:col-span-5">
             {!heroImgError ? (
               <img
-                src={resolvePublicAssetUrl(HERO_IMAGE_URL)}
+                src={heroOfficialPhoto}
                 alt="Suasana pertandingan resmi turnamen catur Pengkot PERCASI Kota Batam"
-                referrerPolicy="no-referrer"
                 onError={() => setHeroImgError(true)}
                 className="h-64 w-full object-cover lg:h-full"
               />

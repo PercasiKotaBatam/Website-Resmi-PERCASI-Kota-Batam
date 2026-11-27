@@ -54,6 +54,7 @@ export interface Athlete {
   title: TitleCode;
   category: AthleteCategory;
   gender: 'Putra' | 'Putri';
+  birthDate?: string;
   birthYear?: number;
   club: string;
   district: BatamDistrict;

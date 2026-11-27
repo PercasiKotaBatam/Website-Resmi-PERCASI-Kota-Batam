@@ -1214,7 +1214,9 @@ export interface AthleteDetailProfile {
   category: string;
   club: string;
   district?: string;
+  birthDate?: string;
   birthYear?: number;
+  age?: number | null;
   photoUrl?: string;
   federationStatus?: string;
   bio: string;
@@ -1458,7 +1460,12 @@ export function buildAthleteDetailProfile(
         ? matchedStanding.club
         : 'Peserta Turnamen PERCASI Batam'),
     district: registeredAthlete?.district,
+    birthDate: registeredAthlete?.birthDate,
     birthYear: registeredAthlete?.birthYear,
+    age: calculateAthleteAge(
+      registeredAthlete?.birthDate,
+      registeredAthlete?.birthYear
+    ),
     photoUrl: registeredAthlete?.photoUrl,
     federationStatus: registeredAthlete?.federationStatus,
     bio:
@@ -1561,4 +1568,71 @@ export function pickAuthoritativePortalData(options: {
   }
   return deployedBase;
 }
+
+export function calculateAthleteAge(
+  birthDate?: string,
+  birthYear?: number,
+  referenceDate: Date = new Date()
+): number | null {
+  if (birthDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate.trim());
+    if (match) {
+      const year = Number.parseInt(match[1], 10);
+      const month = Number.parseInt(match[2], 10);
+      const day = Number.parseInt(match[3], 10);
+      const refYear = referenceDate.getFullYear();
+      const refMonth = referenceDate.getMonth() + 1;
+      const refDay = referenceDate.getDate();
+      let age = refYear - year;
+      if (refMonth < month || (refMonth === month && refDay < day)) {
+        age -= 1;
+      }
+      return age >= 0 && age <= 120 ? age : null;
+    }
+  }
+  if (birthYear && Number.isFinite(birthYear)) {
+    const age = referenceDate.getFullYear() - birthYear;
+    return age >= 0 && age <= 120 ? age : null;
+  }
+  return null;
+}
+
+const INDONESIAN_MONTHS = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
+export function formatAthleteBirthDisplay(
+  birthDate?: string,
+  birthYear?: number
+): string {
+  if (birthDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate.trim());
+    if (match) {
+      const year = Number.parseInt(match[1], 10);
+      const monthIdx = Number.parseInt(match[2], 10) - 1;
+      const day = Number.parseInt(match[3], 10);
+      const monthName = INDONESIAN_MONTHS[monthIdx];
+      if (monthName && day >= 1 && day <= 31) {
+        return `${day} ${monthName} ${year}`;
+      }
+    }
+    return birthDate;
+  }
+  if (birthYear && Number.isFinite(birthYear)) {
+    return `Tahun ${birthYear}`;
+  }
+  return '-';
+}
+
 

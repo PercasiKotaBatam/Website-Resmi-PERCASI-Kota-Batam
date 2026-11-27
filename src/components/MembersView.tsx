@@ -10,7 +10,9 @@ import {
   CATEGORY_OPTIONS,
   DISTRICT_OPTIONS,
   TITLE_OPTIONS,
+  calculateAthleteAge,
   filterAthletes,
+  formatAthleteBirthDisplay,
 } from '../utils/portalLogic';
 import { AthleteAvatar } from './AthleteAvatar';
 import { TitleBadge } from './TitleBadge';
@@ -203,7 +205,7 @@ export function MembersView({
         </div>
       )}
 
-      {/* Athletes Grid */}
+      {/* Athletes Vertical List */}
       {filteredAthletes.length === 0 ? (
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-12 text-center">
           <p className="text-base font-bold text-slate-900">
@@ -223,16 +225,28 @@ export function MembersView({
         </div>
       ) : (
         <div
-          data-testid="members-grid"
-          className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="members-list"
+          className="mt-6 space-y-3"
         >
-          {filteredAthletes.map((athlete) => (
-            <article
-              key={athlete.id}
-              className="flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 transition-colors hover:border-slate-300"
-            >
-              <div>
-                <div className="flex items-start gap-3.5">
+          {filteredAthletes.map((athlete, idx) => {
+            const birthDisplay = formatAthleteBirthDisplay(
+              athlete.birthDate,
+              athlete.birthYear
+            );
+            const age = calculateAthleteAge(
+              athlete.birthDate,
+              athlete.birthYear
+            );
+            return (
+              <article
+                key={athlete.id}
+                className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 lg:flex-row lg:items-center lg:justify-between lg:px-5"
+              >
+                {/* Identity & Club */}
+                <div className="flex min-w-0 flex-1 items-start gap-3.5 sm:items-center">
+                  <span className="font-mono-tabular hidden w-7 shrink-0 text-right text-xs font-bold text-slate-400 sm:inline-block">
+                    #{idx + 1}
+                  </span>
                   <AthleteAvatar
                     name={athlete.fullName}
                     photoUrl={athlete.photoUrl}
@@ -257,68 +271,90 @@ export function MembersView({
                         {athlete.fullName}
                       </button>
                     </h2>
-                  </div>
-                </div>
-
-                <p className="mt-3 text-xs text-slate-600">
-                  {athlete.club} ·{' '}
-                  <span className="font-medium text-slate-800">
-                    Kec. {athlete.district}
-                  </span>
-                </p>
-
-                {/* Rating Grid */}
-                <div className="mt-4 grid grid-cols-3 divide-x divide-slate-200 rounded-md border border-slate-200 bg-slate-50 py-2.5 text-center">
-                  <div>
-                    <p className="text-[11px] font-medium text-slate-500">
-                      Standard
-                    </p>
-                    <p className="font-mono-tabular mt-0.5 text-sm font-bold text-[#0F2342]">
-                      {athlete.ratings.standard > 0 ? athlete.ratings.standard : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-slate-500">
-                      Rapid
-                    </p>
-                    <p className="font-mono-tabular mt-0.5 text-sm font-bold text-[#0F2342]">
-                      {athlete.ratings.rapid > 0 ? athlete.ratings.rapid : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-slate-500">
-                      Blitz
-                    </p>
-                    <p className="font-mono-tabular mt-0.5 text-sm font-bold text-[#0F2342]">
-                      {athlete.ratings.blitz > 0 ? athlete.ratings.blitz : '-'}
+                    <p className="mt-0.5 truncate text-xs text-slate-600">
+                      {athlete.club} ·{' '}
+                      <span className="font-medium text-slate-800">
+                        Kec. {athlete.district}
+                      </span>
                     </p>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => onSelectAthlete(athlete)}
-                  className="inline-flex h-9 items-center rounded-md px-2 text-xs font-bold text-[#0F2342] hover:bg-slate-100"
-                >
-                  Lihat Profil Lengkap
-                </button>
+                {/* Birth Date, Age, Ratings & Actions */}
+                <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center lg:border-t-0 lg:pt-0 lg:gap-5">
+                  <div className="grid grid-cols-2 gap-4 sm:flex sm:items-center sm:gap-5">
+                    <div className="min-w-[118px]">
+                      <p className="text-[11px] font-medium text-slate-500">
+                        Tanggal Lahir
+                      </p>
+                      <p className="font-mono-tabular mt-0.5 text-xs font-semibold text-slate-900">
+                        {birthDisplay}
+                      </p>
+                    </div>
+                    <div className="min-w-[74px]">
+                      <p className="text-[11px] font-medium text-slate-500">
+                        Umur
+                      </p>
+                      <p className="font-mono-tabular mt-0.5 text-xs font-semibold text-slate-900">
+                        {age !== null ? `${age} tahun` : '-'}
+                      </p>
+                    </div>
+                  </div>
 
-                {isAdminMode && (
-                  <button
-                    type="button"
-                    onClick={() => onEditMember(athlete)}
-                    aria-label={`Edit profil ${athlete.fullName}`}
-                    className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>Edit</span>
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
+                  {/* Compact Ratings */}
+                  <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-md border border-slate-200 bg-slate-50 py-1.5 text-center sm:w-48">
+                    <div className="px-2">
+                      <p className="text-[10px] font-medium text-slate-500">
+                        STD
+                      </p>
+                      <p className="font-mono-tabular text-xs font-bold text-[#0F2342]">
+                        {athlete.ratings.standard > 0 ? athlete.ratings.standard : '-'}
+                      </p>
+                    </div>
+                    <div className="px-2">
+                      <p className="text-[10px] font-medium text-slate-500">
+                        RPD
+                      </p>
+                      <p className="font-mono-tabular text-xs font-bold text-[#0F2342]">
+                        {athlete.ratings.rapid > 0 ? athlete.ratings.rapid : '-'}
+                      </p>
+                    </div>
+                    <div className="px-2">
+                      <p className="text-[10px] font-medium text-slate-500">
+                        BLZ
+                      </p>
+                      <p className="font-mono-tabular text-xs font-bold text-[#0F2342]">
+                        {athlete.ratings.blitz > 0 ? athlete.ratings.blitz : '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Row Actions */}
+                  <div className="flex items-center gap-2 sm:ml-auto lg:ml-0">
+                    <button
+                      type="button"
+                      onClick={() => onSelectAthlete(athlete)}
+                      className="inline-flex h-9 items-center rounded-md border border-[#0F2342]/20 bg-slate-50 px-3 text-xs font-bold text-[#0F2342] hover:bg-[#0F2342] hover:text-white whitespace-nowrap"
+                    >
+                      Lihat Profil
+                    </button>
+
+                    {isAdminMode && (
+                      <button
+                        type="button"
+                        onClick={() => onEditMember(athlete)}
+                        aria-label={`Edit profil ${athlete.fullName}`}
+                        className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 whitespace-nowrap"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

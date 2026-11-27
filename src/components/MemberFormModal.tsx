@@ -10,6 +10,7 @@ import {
   CATEGORY_OPTIONS,
   DISTRICT_OPTIONS,
   TITLE_OPTIONS,
+  calculateAthleteAge,
 } from '../utils/portalLogic';
 import { compressImageToBase64 } from '../utils/storage';
 import { AthleteAvatar } from './AthleteAvatar';
@@ -31,6 +32,7 @@ export function MemberFormModal({
   const [title, setTitle] = useState<TitleCode>('Non-Gelar');
   const [category, setCategory] = useState<AthleteCategory>('Senior Putra');
   const [gender, setGender] = useState<'Putra' | 'Putri'>('Putra');
+  const [birthDate, setBirthDate] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [club, setClub] = useState('');
   const [district, setDistrict] = useState<BatamDistrict>('Batam Kota');
@@ -49,6 +51,7 @@ export function MemberFormModal({
       setTitle(editingAthlete.title);
       setCategory(editingAthlete.category);
       setGender(editingAthlete.gender);
+      setBirthDate(editingAthlete.birthDate ?? '');
       setBirthYear(editingAthlete.birthYear ? String(editingAthlete.birthYear) : '');
       setClub(editingAthlete.club);
       setDistrict(editingAthlete.district);
@@ -62,6 +65,7 @@ export function MemberFormModal({
       setTitle('Non-Gelar');
       setCategory('Senior Putra');
       setGender('Putra');
+      setBirthDate('');
       setBirthYear('2001');
       setClub('Semanggi Chess Club');
       setDistrict('Batam Kota');
@@ -116,8 +120,18 @@ export function MemberFormModal({
       return;
     }
 
+    const trimmedBirthDate = birthDate.trim();
+    if (trimmedBirthDate && !/^\d{4}-\d{2}-\d{2}$/.test(trimmedBirthDate)) {
+      setError('Format tanggal lahir tidak valid.');
+      return;
+    }
+
+    const birthDateYear = trimmedBirthDate
+      ? Number.parseInt(trimmedBirthDate.slice(0, 4), 10)
+      : undefined;
     const trimmedBirth = birthYear.trim();
-    const parsedBirth = trimmedBirth ? Number.parseInt(trimmedBirth, 10) : undefined;
+    const parsedBirth =
+      birthDateYear ?? (trimmedBirth ? Number.parseInt(trimmedBirth, 10) : undefined);
     const parsedStd = Number.parseInt(standard, 10);
     const parsedRpd = Number.parseInt(rapid, 10);
     const parsedBlz = Number.parseInt(blitz, 10);
@@ -126,7 +140,7 @@ export function MemberFormModal({
       parsedBirth !== undefined &&
       (Number.isNaN(parsedBirth) || parsedBirth < 1935 || parsedBirth > 2022)
     ) {
-      setError('Tahun lahir tidak valid (1935–2022).');
+      setError('Tahun/tanggal lahir tidak valid (1935–2022).');
       return;
     }
 
@@ -142,6 +156,7 @@ export function MemberFormModal({
       title,
       category,
       gender,
+      ...(trimmedBirthDate ? { birthDate: trimmedBirthDate } : {}),
       ...(parsedBirth !== undefined ? { birthYear: parsedBirth } : {}),
       club: trimmedClub,
       district,
@@ -161,6 +176,14 @@ export function MemberFormModal({
     onSave(payload, Boolean(editingAthlete));
     onClose();
   };
+
+  const previewBirthYear = birthYear.trim()
+    ? Number.parseInt(birthYear.trim(), 10)
+    : undefined;
+  const previewAge = calculateAthleteAge(
+    birthDate.trim() || undefined,
+    previewBirthYear && !Number.isNaN(previewBirthYear) ? previewBirthYear : undefined
+  );
 
   return (
     <div
@@ -312,38 +335,61 @@ export function MemberFormModal({
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label
-                  htmlFor="member-gender"
-                  className="mb-1 block text-xs font-semibold text-slate-700"
-                >
-                  Putra / Putri
-                </label>
-                <select
-                  id="member-gender"
-                  value={gender}
-                  onChange={(e) =>
-                    setGender(e.target.value as 'Putra' | 'Putri')
-                  }
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-[#0F2342] focus:outline-none"
-                >
-                  <option value="Putra">Putra</option>
-                  <option value="Putri">Putri</option>
-                </select>
-              </div>
-              <div>
-                <label
-                  htmlFor="member-birthyear"
-                  className="mb-1 block text-xs font-semibold text-slate-700"
-                >
-                  Tahun Lahir
-                </label>
+            <div>
+              <label
+                htmlFor="member-gender"
+                className="mb-1 block text-xs font-semibold text-slate-700"
+              >
+                Putra / Putri
+              </label>
+              <select
+                id="member-gender"
+                value={gender}
+                onChange={(e) =>
+                  setGender(e.target.value as 'Putra' | 'Putri')
+                }
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-[#0F2342] focus:outline-none"
+              >
+                <option value="Putra">Putra</option>
+                <option value="Putri">Putri</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="member-birthdate"
+                className="mb-1 block text-xs font-semibold text-slate-700"
+              >
+                Tanggal Lahir{' '}
+                {previewAge !== null && (
+                  <span className="font-normal text-slate-500">
+                    (Umur: {previewAge} tahun)
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  id="member-birthdate"
+                  type="date"
+                  min="1935-01-01"
+                  max="2022-12-31"
+                  value={birthDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBirthDate(val);
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+                      setBirthYear(val.slice(0, 4));
+                    }
+                  }}
+                  className="font-mono-tabular h-10 w-full rounded-md border border-slate-300 px-2.5 text-xs focus:border-[#0F2342] focus:outline-none sm:text-sm"
+                />
                 <input
                   id="member-birthyear"
                   type="number"
                   min={1935}
                   max={2022}
+                  aria-label="Tahun Lahir"
+                  placeholder="Tahun"
                   value={birthYear}
                   onChange={(e) => setBirthYear(e.target.value)}
                   className="font-mono-tabular h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#0F2342] focus:outline-none"

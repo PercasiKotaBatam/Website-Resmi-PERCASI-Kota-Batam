@@ -4,9 +4,11 @@ import * as XLSX from 'xlsx';
 import {
   buildAthleteDetailProfile,
   buildInitialRankings,
+  calculateAthleteAge,
   evaluatePairingOutcome,
   filterAthletes,
   filterPairingsByRound,
+  formatAthleteBirthDisplay,
   formatRatingDelta,
   generateSampleCsvTemplate,
   generateSampleExcelBytes,
@@ -703,4 +705,39 @@ test('pickAuthoritativePortalData ignores stale passive localStorage cache and h
   assert.equal(resolvedAdmin.tournaments.length, 4);
   assert.equal(resolvedAdmin.tournaments[3]?.name, 'Walikota Cup 2026');
 });
+
+test('calculateAthleteAge and formatAthleteBirthDisplay format dates, birth years, and ages accurately', () => {
+  const refDate = new Date(2026, 10, 27); // 27 Nov 2026
+  assert.equal(calculateAthleteAge('1990-05-14', 1990, refDate), 36);
+  assert.equal(calculateAthleteAge('1990-12-15', 1990, refDate), 35);
+  assert.equal(calculateAthleteAge(undefined, 1990, refDate), 36);
+  assert.equal(calculateAthleteAge(undefined, undefined, refDate), null);
+
+  assert.equal(formatAthleteBirthDisplay('1990-05-14', 1990), '14 Mei 1990');
+  assert.equal(formatAthleteBirthDisplay(undefined, 1990), 'Tahun 1990');
+  assert.equal(formatAthleteBirthDisplay(undefined, undefined), '-');
+
+  const godfrid = buildAthleteDetailProfile('ath-01', SEED_ATHLETES, SEED_TOURNAMENTS);
+  assert.equal(godfrid.birthYear, 1990);
+  assert.equal(godfrid.age, new Date().getFullYear() - 1990);
+
+  const customWithBirthDate = buildAthleteDetailProfile(
+    'c-1',
+    [
+      {
+        ...SAMPLE_ATHLETES[0]!,
+        id: 'c-1',
+        birthDate: '2000-01-10',
+        birthYear: 2000,
+      },
+    ],
+    SEED_TOURNAMENTS
+  );
+  assert.equal(customWithBirthDate.birthDate, '2000-01-10');
+  assert.equal(
+    customWithBirthDate.age,
+    calculateAthleteAge('2000-01-10', 2000)
+  );
+});
+
 

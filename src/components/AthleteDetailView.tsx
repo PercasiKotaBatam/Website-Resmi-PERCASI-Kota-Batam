@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { Athlete } from '../types/chess';
 import {
   buildAthleteDetailProfile,
+  formatAthleteBirthDisplay,
   formatRatingDelta,
   type ColorWdlStats,
 } from '../utils/portalLogic';
@@ -230,12 +231,20 @@ export function AthleteDetailView({
                         : 'Kota Batam'}
                   </span>
                 </span>
-                {profile.birthYear && (
-                  <span className="font-mono-tabular">
-                    Tahun Lahir:{' '}
-                    <strong className="text-slate-900">{profile.birthYear}</strong>
-                  </span>
-                )}
+                <span className="font-mono-tabular">
+                  Tanggal Lahir:{' '}
+                  <strong className="text-slate-900">
+                    {formatAthleteBirthDisplay(profile.birthDate, profile.birthYear)}
+                  </strong>
+                </span>
+                <span className="font-mono-tabular">
+                  Umur:{' '}
+                  <strong className="text-slate-900">
+                    {profile.age !== null && profile.age !== undefined
+                      ? `${profile.age} tahun`
+                      : '-'}
+                  </strong>
+                </span>
                 {profile.seedNumber !== undefined && (
                   <span className="font-mono-tabular">
                     Seed Turnamen:{' '}

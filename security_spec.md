@@ -17,6 +17,6 @@
 7. **Resource / ID Poisoning**: Payload sets `athleteId = "../bad/id"` or a 500-char ID string -> MUST fail `isValidId()` (`^[a-zA-Z0-9_\-]+$`, `<= 128`).
 8. **Document ID / Field Mismatch**: Path `/athletes/ath-01` written with `data.id = "ath-999"` -> MUST fail `data.id == athleteId`.
 9. **Oversized String DoS**: `athlete.bio` or `tournament.description` exceeds `maxLength` -> MUST fail `.size()` validation.
-10. **Invalid Enum / Value Poisoning**: `athlete.title` set to `"FAKE_GM"` or `athlete.ratings.standard` set to `"NaN"` string -> MUST fail type/enum checks.
+10. **Invalid Enum / Value Poisoning**: `athlete.title` set to `"FAKE_GM"`, `athlete.coachTitle` set to `"FAKE_COACH"`, `athlete.arbiterTitle` set to `"FAKE_ARB"`, or `athlete.ratings.standard` set to `"NaN"` string -> MUST fail type/enum checks.
 11. **Timestamp Forgery / Unaudited Meta**: `/portalMeta/state` written with `updatedByUid` !== `request.auth.uid` or invalid `updatedAt` -> MUST fail identity binding.
 12. **Unbounded Array Bomb**: `athlete.tournamentHistory` exceeds 100 items or `tournament.pairings` exceeds 5000 items -> MUST fail `.size()` upper bound.

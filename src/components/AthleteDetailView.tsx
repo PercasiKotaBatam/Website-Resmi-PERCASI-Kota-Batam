@@ -194,7 +194,13 @@ export function AthleteDetailView({
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                <TitleBadge title={profile.title} />
+                <TitleBadge title={profile.title} variant="player" />
+                {profile.coachTitle && (
+                  <TitleBadge title={profile.coachTitle} variant="coach" />
+                )}
+                {profile.arbiterTitle && (
+                  <TitleBadge title={profile.arbiterTitle} variant="arbiter" />
+                )}
                 <span className="font-semibold text-slate-700">
                   {profile.category}
                 </span>

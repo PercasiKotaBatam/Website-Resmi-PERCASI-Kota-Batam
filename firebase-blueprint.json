@@ -60,6 +60,14 @@
           "type": "string",
           "enum": ["GM", "IM", "FM", "WFM", "NM", "MP", "AGM", "AIM", "AFM", "ACM", "Non-Gelar"]
         },
+        "coachTitle": {
+          "type": "string",
+          "enum": ["FST", "FT", "FI", "NI", "DI", "PN", "PNM", "PNP"]
+        },
+        "arbiterTitle": {
+          "type": "string",
+          "enum": ["IA", "FA", "NA", "WN", "WNM", "WNP"]
+        },
         "category": {
           "type": "string",
           "enum": ["Senior Putra", "Senior Putri", "Junior U-18", "Junior U-14", "Veteran"]

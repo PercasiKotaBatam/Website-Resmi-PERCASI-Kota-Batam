@@ -153,18 +153,20 @@ export function migratePortalData(data: PortalData): PortalData {
           );
         const needsDarwinInitialUpgrade =
           !Array.isArray(t.initialRankings) ||
-          t.initialRankings.length < DARWIN_CUP_INITIAL_RANKINGS.length ||
-          t.initialRankings.some((row) => row.gender === undefined && row.clubCity === undefined) ||
+          t.initialRankings.length === 0 ||
+          t.initialRankings.some(
+            (row) => row.gender === undefined && row.clubCity === undefined
+          ) ||
           hasLegacyTagorSeed;
+        const resolvedInitial = needsDarwinInitialUpgrade
+          ? DARWIN_CUP_INITIAL_RANKINGS
+          : enrichInitialRankingsMasterTitles(t.initialRankings!, mergedAthletes);
         return {
           ...t,
-          participantsCount: Math.max(
-            t.participantsCount || 0,
-            DARWIN_CUP_INITIAL_RANKINGS.length
-          ),
-          initialRankings: needsDarwinInitialUpgrade
-            ? DARWIN_CUP_INITIAL_RANKINGS
-            : enrichInitialRankingsMasterTitles(t.initialRankings!, mergedAthletes),
+          participantsCount: needsDarwinInitialUpgrade
+            ? Math.max(t.participantsCount || 0, DARWIN_CUP_INITIAL_RANKINGS.length)
+            : Math.max(resolvedInitial.length, safeStandings.length),
+          initialRankings: resolvedInitial,
           standings: safeStandings,
           pairings: safePairings,
         };
@@ -191,6 +193,12 @@ export function migratePortalData(data: PortalData): PortalData {
       const isLegacyVenueOrDate =
         t.venue === 'Atrium Utama DC Mall Batam' ||
         t.startDate === '14 Nov 2026';
+      const needsFirdausInitialUpgrade =
+        !Array.isArray(t.initialRankings) ||
+        t.initialRankings.length === 0 ||
+        t.initialRankings.some(
+          (row) => row.gender === undefined && row.clubCity === undefined
+        );
       return {
         ...t,
         name: isLegacyNameOrTc ? 'Firdaus Cup 2026' : t.name,
@@ -208,11 +216,9 @@ export function migratePortalData(data: PortalData): PortalData {
           ? '10 menit + 3 detik'
           : t.timeControlDetail,
         description: isLegacyNameOrTc ? '' : t.description,
-        initialRankings:
-          !Array.isArray(t.initialRankings) ||
-          t.initialRankings.length < FIRDAUS_CUP_INITIAL_RANKINGS.length
-            ? FIRDAUS_CUP_INITIAL_RANKINGS
-            : enrichInitialRankingsMasterTitles(t.initialRankings, mergedAthletes),
+        initialRankings: needsFirdausInitialUpgrade
+          ? FIRDAUS_CUP_INITIAL_RANKINGS
+          : enrichInitialRankingsMasterTitles(t.initialRankings!, mergedAthletes),
         standings:
           safeStandings.length === 0 ? FIRDAUS_CUP_STANDINGS : safeStandings,
         pairings:
@@ -298,18 +304,21 @@ export function loadPortalData(): PortalData {
 
 export function savePortalData(
   data: PortalData,
-  markLocalEdited = true
+  markLocalEdited = true,
+  minFloorIso?: string
 ): PortalData {
   let nextUpdatedAt = data.updatedAt;
   if (markLocalEdited) {
     const seedMs = Date.parse(SEED_PORTAL_DATA.updatedAt) || 0;
     const dataMs = Date.parse(data.updatedAt) || 0;
+    const floorMs = minFloorIso ? Date.parse(minFloorIso) || 0 : 0;
     const existingLocal = readLocalPortalSnapshot().data;
     const existingMs = existingLocal ? Date.parse(existingLocal.updatedAt) || 0 : 0;
     const monotonicMs = Math.max(
       Date.now(),
       seedMs + 1000,
       dataMs + 1000,
+      floorMs + 1000,
       existingMs + 1000
     );
     nextUpdatedAt = new Date(monotonicMs).toISOString();

@@ -245,12 +245,12 @@ export function AdminLoginModal({
                 <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-extrabold text-emerald-950">
-                    Sinkronisasi Cloud (AI Studio &amp; GitHub Pages)
+                    Wajib untuk Sinkron Laptop ↔ HP Android &amp; GitHub
                   </p>
                   <p className="mt-1 text-[11px] leading-relaxed text-emerald-900">
                     Masuk dengan akun Google Admin{' '}
                     <span className="font-mono font-semibold">{BOOTSTRAPPED_ADMIN_EMAIL}</span>{' '}
-                    agar semua edit keanggotaan, turnamen, dan pairing tersimpan permanen di cloud dan langsung sama di AI Studio maupun GitHub.
+                    agar semua perubahan atlet, turnamen, peringkat awal, dan pairing tersimpan permanen di Cloud Firestore dan langsung tampil sama di HP Android maupun situs GitHub.
                   </p>
                 </div>
               </div>
@@ -271,19 +271,26 @@ export function AdminLoginModal({
 
             <div className="relative flex items-center py-1">
               <div className="grow border-t border-slate-200" />
-              <span className="mx-3 shrink-0 text-[11px] font-semibold text-slate-400">
-                atau login {isStatic ? 'lokal' : 'server'}
+              <span className="mx-3 shrink-0 text-[11px] font-semibold text-slate-500">
+                atau Mode Lokal / {isStatic ? 'Perangkat Ini Saja' : 'Server Dev Lokal'}
               </span>
               <div className="grow border-t border-slate-200" />
+            </div>
+
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-950">
+              <p className="font-bold">Catatan: Login Username &amp; Password tidak sinkron ke HP Android</p>
+              <p className="mt-0.5">
+                Perubahan hanya tersimpan di perangkat ini. Untuk sinkron antar perangkat (Laptop → HP Android), gunakan{' '}
+                <strong>Masuk dengan Google Admin</strong> di atas.
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {isStatic && !configured && (
                 <div className="rounded-md border border-sky-200 bg-sky-50 px-3.5 py-3 text-xs leading-relaxed text-sky-950">
-                  <p className="font-bold">Mode Admin Lokal</p>
+                  <p className="font-bold">Aktivasi Akun Lokal</p>
                   <p className="mt-1">
-                    Menyimpan akun admin lokal di peramban ini. Gunakan{' '}
-                    <strong>Masuk dengan Google Admin</strong> di atas jika ingin perubahan tersinkron otomatis ke semua perangkat dan situs.
+                    Menyimpan akun admin lokal hanya di peramban ini.
                   </p>
                 </div>
               )}

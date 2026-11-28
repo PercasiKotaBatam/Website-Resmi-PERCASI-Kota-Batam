@@ -1,15 +1,19 @@
 import { Edit3, RotateCcw, Search, UserPlus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type {
+  ArbiterTitleCode,
   Athlete,
   AthleteCategory,
   BatamDistrict,
+  CoachTitleCode,
   KepriCity,
   TitleCode,
 } from '../types/chess';
 import {
+  ARBITER_TITLE_OPTIONS,
   CATEGORY_OPTIONS,
   CITY_OPTIONS,
+  COACH_TITLE_OPTIONS,
   DISTRICT_OPTIONS,
   TITLE_OPTIONS,
   calculateAthleteAge,
@@ -38,6 +42,8 @@ export function MembersView({
 }: MembersViewProps) {
   const [query, setQuery] = useState('');
   const [titleFilter, setTitleFilter] = useState<TitleCode | 'Semua'>('Semua');
+  const [coachTitleFilter, setCoachTitleFilter] = useState<CoachTitleCode | 'Semua'>('Semua');
+  const [arbiterTitleFilter, setArbiterTitleFilter] = useState<ArbiterTitleCode | 'Semua'>('Semua');
   const [categoryFilter, setCategoryFilter] = useState<AthleteCategory | 'Semua'>('Semua');
   const [cityFilter, setCityFilter] = useState<KepriCity | 'Semua'>('Semua');
   const [districtFilter, setDistrictFilter] = useState<BatamDistrict | 'Semua'>('Semua');
@@ -47,16 +53,29 @@ export function MembersView({
       filterAthletes(athletes, {
         query,
         title: titleFilter,
+        coachTitle: coachTitleFilter,
+        arbiterTitle: arbiterTitleFilter,
         category: categoryFilter,
         city: cityFilter,
         district: districtFilter,
       }),
-    [athletes, query, titleFilter, categoryFilter, cityFilter, districtFilter]
+    [
+      athletes,
+      query,
+      titleFilter,
+      coachTitleFilter,
+      arbiterTitleFilter,
+      categoryFilter,
+      cityFilter,
+      districtFilter,
+    ]
   );
 
   const hasActiveFilters =
     Boolean(query.trim()) ||
     titleFilter !== 'Semua' ||
+    coachTitleFilter !== 'Semua' ||
+    arbiterTitleFilter !== 'Semua' ||
     categoryFilter !== 'Semua' ||
     cityFilter !== 'Semua' ||
     districtFilter !== 'Semua';
@@ -64,6 +83,8 @@ export function MembersView({
   const resetFilters = () => {
     setQuery('');
     setTitleFilter('Semua');
+    setCoachTitleFilter('Semua');
+    setArbiterTitleFilter('Semua');
     setCategoryFilter('Semua');
     setCityFilter('Semua');
     setDistrictFilter('Semua');
@@ -105,13 +126,13 @@ export function MembersView({
       </div>
 
       {/* Filter Bar */}
-      <div className="mt-6 grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="mt-6 grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2 lg:col-span-2">
           <label
             htmlFor="member-search"
             className="mb-1.5 block text-xs font-semibold text-slate-700"
           >
-            Cari Nama / Klub / Kota / Kecamatan
+            Cari Nama / Klub / Kota / Gelar
           </label>
           <div className="relative">
             <Search
@@ -123,7 +144,7 @@ export function MembersView({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Contoh: Godfrid, Tanjung Pinang, Bintan..."
+              placeholder="Contoh: Godfrid, Tanjung Pinang, PNP, WNM..."
               className="h-10 w-full rounded-md border border-slate-300 bg-white pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F2342] focus:outline-none"
             />
           </div>
@@ -159,21 +180,23 @@ export function MembersView({
 
         <div>
           <label
-            htmlFor="filter-title"
+            htmlFor="filter-district"
             className="mb-1.5 block text-xs font-semibold text-slate-700"
           >
-            Gelar
+            Kecamatan (Batam)
           </label>
           <select
-            id="filter-title"
-            value={titleFilter}
-            onChange={(e) => setTitleFilter(e.target.value as TitleCode | 'Semua')}
+            id="filter-district"
+            value={districtFilter}
+            onChange={(e) =>
+              setDistrictFilter(e.target.value as BatamDistrict | 'Semua')
+            }
             className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#0F2342] focus:outline-none"
           >
-            <option value="Semua">Semua Gelar</option>
-            {TITLE_OPTIONS.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            <option value="Semua">Semua Kecamatan</option>
+            {DISTRICT_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {d}
               </option>
             ))}
           </select>
@@ -205,23 +228,69 @@ export function MembersView({
 
         <div>
           <label
-            htmlFor="filter-district"
+            htmlFor="filter-title"
             className="mb-1.5 block text-xs font-semibold text-slate-700"
           >
-            Kecamatan (Batam)
+            Gelar Atlet
           </label>
           <select
-            id="filter-district"
-            value={districtFilter}
+            id="filter-title"
+            value={titleFilter}
+            onChange={(e) => setTitleFilter(e.target.value as TitleCode | 'Semua')}
+            className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#0F2342] focus:outline-none"
+          >
+            <option value="Semua">Semua Gelar</option>
+            {TITLE_OPTIONS.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="filter-coach-title"
+            className="mb-1.5 block text-xs font-semibold text-slate-700"
+          >
+            Gelar Pelatih
+          </label>
+          <select
+            id="filter-coach-title"
+            value={coachTitleFilter}
             onChange={(e) =>
-              setDistrictFilter(e.target.value as BatamDistrict | 'Semua')
+              setCoachTitleFilter(e.target.value as CoachTitleCode | 'Semua')
             }
             className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#0F2342] focus:outline-none"
           >
-            <option value="Semua">Semua Kecamatan</option>
-            {DISTRICT_OPTIONS.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            <option value="Semua">Semua Pelatih</option>
+            {COACH_TITLE_OPTIONS.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="filter-arbiter-title"
+            className="mb-1.5 block text-xs font-semibold text-slate-700"
+          >
+            Gelar Wasit
+          </label>
+          <select
+            id="filter-arbiter-title"
+            value={arbiterTitleFilter}
+            onChange={(e) =>
+              setArbiterTitleFilter(e.target.value as ArbiterTitleCode | 'Semua')
+            }
+            className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#0F2342] focus:outline-none"
+          >
+            <option value="Semua">Semua Wasit</option>
+            {ARBITER_TITLE_OPTIONS.map((a) => (
+              <option key={a} value={a}>
+                {a}
               </option>
             ))}
           </select>
@@ -295,8 +364,14 @@ export function MembersView({
                     size="md"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <TitleBadge title={athlete.title} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <TitleBadge title={athlete.title} variant="player" />
+                      {athlete.coachTitle && (
+                        <TitleBadge title={athlete.coachTitle} variant="coach" />
+                      )}
+                      {athlete.arbiterTitle && (
+                        <TitleBadge title={athlete.arbiterTitle} variant="arbiter" />
+                      )}
                       <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
                         {athlete.federationStatus}
                       </span>

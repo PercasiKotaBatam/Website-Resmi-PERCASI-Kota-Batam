@@ -19,6 +19,24 @@ export type TitleCode =
   | 'ACM'
   | 'Non-Gelar';
 
+export type CoachTitleCode =
+  | 'FST'
+  | 'FT'
+  | 'FI'
+  | 'NI'
+  | 'DI'
+  | 'PN'
+  | 'PNM'
+  | 'PNP';
+
+export type ArbiterTitleCode =
+  | 'IA'
+  | 'FA'
+  | 'NA'
+  | 'WN'
+  | 'WNM'
+  | 'WNP';
+
 export type AthleteCategory =
   | 'Senior Putra'
   | 'Senior Putri'
@@ -61,6 +79,8 @@ export interface Athlete {
   id: string;
   fullName: string;
   title: TitleCode;
+  coachTitle?: CoachTitleCode;
+  arbiterTitle?: ArbiterTitleCode;
   category: AthleteCategory;
   gender: 'Putra' | 'Putri';
   birthDate?: string;

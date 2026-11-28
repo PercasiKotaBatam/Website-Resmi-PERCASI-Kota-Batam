@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   CheckCircle2,
   Cloud,
   Database,
@@ -19,8 +20,10 @@ export type ProjectSyncStatus =
 
 interface AdminToolbarProps {
   syncStatus?: ProjectSyncStatus;
+  syncErrorMessage?: string;
   isCloudAdmin?: boolean;
   onConnectCloudAdmin?: () => void;
+  onForceCloudSync?: () => void;
   onAddMember: () => void;
   onUploadTournament: () => void;
   onOpenBackup: () => void;
@@ -29,8 +32,10 @@ interface AdminToolbarProps {
 
 export function AdminToolbar({
   syncStatus = 'idle',
+  syncErrorMessage = '',
   isCloudAdmin = false,
   onConnectCloudAdmin,
+  onForceCloudSync,
   onAddMember,
   onUploadTournament,
   onOpenBackup,
@@ -41,7 +46,7 @@ export function AdminToolbar({
       aria-label="Panel Kendali Admin Pengkot"
       className="border-b border-amber-200 bg-amber-50/90"
     >
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:flex-nowrap lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-amber-950">
           <Shield className="h-4 w-4 text-amber-800 shrink-0" aria-hidden="true" />
           <span>Mode Admin Aktif</span>
@@ -51,39 +56,27 @@ export function AdminToolbar({
           {syncStatus === 'cloud-syncing' ? (
             <span className="inline-flex items-center gap-1 font-normal text-amber-900">
               <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
-              Menyinkronkan ke Cloud (AI Studio &amp; GitHub)...
+              Menyinkronkan ke Cloud (Laptop, HP Android &amp; GitHub)...
             </span>
           ) : syncStatus === 'cloud-synced' ? (
             <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
               <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Tersinkron Cloud · AI Studio &amp; GitHub Pages sama
+              Sinkron Cloud Aktif · Laptop, HP Android &amp; GitHub sama
             </span>
           ) : syncStatus === 'cloud-error' ? (
             <span className="font-semibold text-[#B91C1C]">
-              Gagal menyinkronkan ke Cloud — perubahan tersimpan lokal
+              Gagal menyinkronkan ke Cloud
+              {syncErrorMessage ? `: ${syncErrorMessage}` : ' — perubahan masih tersimpan lokal'}
             </span>
-          ) : syncStatus === 'syncing' ? (
-            <span className="inline-flex items-center gap-1 font-normal text-amber-900">
-              <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
-              Menyinkronkan ke server...
-            </span>
-          ) : syncStatus === 'synced' ? (
-            <span className="inline-flex items-center gap-1 font-medium text-emerald-800">
-              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Tersimpan di server &amp; peramban ini
-            </span>
-          ) : syncStatus === 'local-only' ? (
-            <span className="font-normal text-amber-900">
-              Tersimpan di peramban ini
-            </span>
-          ) : isCloudAdmin ? (
-            <span className="inline-flex items-center gap-1 font-medium text-emerald-800">
-              <Cloud className="h-3.5 w-3.5" aria-hidden="true" />
-              Cloud Admin terhubung (AI Studio &amp; GitHub sinkron)
+          ) : !isCloudAdmin ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-[#B91C1C]">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Belum Sinkron Cloud — hanya tersimpan di perangkat ini (tidak muncul di HP Android)
             </span>
           ) : (
-            <span className="font-normal text-amber-900">
-              Tersimpan di peramban ini
+            <span className="inline-flex items-center gap-1 font-medium text-emerald-800">
+              <Cloud className="h-3.5 w-3.5" aria-hidden="true" />
+              Cloud Admin terhubung (Laptop, HP Android &amp; GitHub sinkron)
             </span>
           )}
 
@@ -91,10 +84,21 @@ export function AdminToolbar({
             <button
               type="button"
               onClick={onConnectCloudAdmin}
-              className="inline-flex h-7 items-center gap-1 rounded border border-emerald-700 bg-emerald-50 px-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 whitespace-nowrap"
+              className="inline-flex h-7 items-center gap-1 rounded border border-emerald-700 bg-emerald-50 px-2.5 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 whitespace-nowrap"
             >
               <Cloud className="h-3 w-3" aria-hidden="true" />
-              <span>Aktifkan Sinkron Cloud</span>
+              <span>Aktifkan Sinkron Cloud (Google Admin)</span>
+            </button>
+          )}
+
+          {isCloudAdmin && onForceCloudSync && syncStatus !== 'cloud-syncing' && (
+            <button
+              type="button"
+              onClick={onForceCloudSync}
+              className="inline-flex h-7 items-center gap-1 rounded border border-emerald-700 bg-white px-2.5 text-[11px] font-bold text-emerald-900 hover:bg-emerald-50 whitespace-nowrap"
+            >
+              <RefreshCw className="h-3 w-3" aria-hidden="true" />
+              <span>{syncStatus === 'cloud-error' ? 'Coba Sinkron Ulang' : 'Sinkron Ulang Cloud'}</span>
             </button>
           )}
         </div>

@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from 'xlsx';
 import {
+  ARBITER_TITLE_OPTIONS,
   buildAthleteDetailProfile,
   buildInitialRankings,
   calculateAthleteAge,
   CITY_OPTIONS,
+  COACH_TITLE_OPTIONS,
   evaluatePairingOutcome,
   filterAthletes,
   filterPairingsByRound,
@@ -15,12 +17,15 @@ import {
   formatRatingDelta,
   generateSampleCsvTemplate,
   generateSampleExcelBytes,
+  generateSampleInitialRankingsExcelBytes,
   generateSamplePairingsExcelBytes,
   getAthleteCity,
   getInitials,
   getPlayerDisplayParts,
   mergeRoundPairings,
   normalizeAthleteName,
+  parseInitialRankingsCsv,
+  parseInitialRankingsExcelBuffer,
   parsePairingsCsv,
   parsePairingsExcelBuffer,
   parseStandingsCsv,
@@ -1202,3 +1207,163 @@ test('savePortalData monotonic timestamp preserves admin edits and pairings acro
     }
   }
 });
+
+test('COACH_TITLE_OPTIONS and ARBITER_TITLE_OPTIONS match exact requested order and filterAthletes/profile handle them', () => {
+  assert.deepEqual(COACH_TITLE_OPTIONS, [
+    'FST',
+    'FT',
+    'FI',
+    'NI',
+    'DI',
+    'PN',
+    'PNM',
+    'PNP',
+  ]);
+  assert.deepEqual(ARBITER_TITLE_OPTIONS, [
+    'IA',
+    'FA',
+    'NA',
+    'WN',
+    'WNM',
+    'WNP',
+  ]);
+
+  const titledAthletes: Athlete[] = [
+    {
+      ...SAMPLE_ATHLETES[0]!,
+      coachTitle: 'FI',
+      arbiterTitle: 'FA',
+    },
+    {
+      ...SAMPLE_ATHLETES[1]!,
+      coachTitle: 'PNP',
+      arbiterTitle: 'WNM',
+    },
+    {
+      ...SAMPLE_ATHLETES[2]!,
+    },
+  ];
+
+  assert.deepEqual(
+    filterAthletes(titledAthletes, { coachTitle: 'FI' }).map((a) => a.id),
+    ['a1']
+  );
+  assert.deepEqual(
+    filterAthletes(titledAthletes, { coachTitle: 'PNP' }).map((a) => a.id),
+    ['a2']
+  );
+  assert.deepEqual(
+    filterAthletes(titledAthletes, { arbiterTitle: 'FA' }).map((a) => a.id),
+    ['a1']
+  );
+  assert.deepEqual(
+    filterAthletes(titledAthletes, { arbiterTitle: 'WNM' }).map((a) => a.id),
+    ['a2']
+  );
+  assert.deepEqual(
+    filterAthletes(titledAthletes, { coachTitle: 'PNP', arbiterTitle: 'WNM' }).map((a) => a.id),
+    ['a2']
+  );
+  assert.deepEqual(
+    filterAthletes(titledAthletes, { query: 'wnm' }).map((a) => a.id),
+    ['a2']
+  );
+  assert.deepEqual(
+    filterAthletes(titledAthletes, { query: 'fi' }).map((a) => a.id),
+    ['a1']
+  );
+
+  const profileA2 = buildAthleteDetailProfile('a2', titledAthletes, SEED_TOURNAMENTS);
+  assert.equal(profileA2.coachTitle, 'PNP');
+  assert.equal(profileA2.arbiterTitle, 'WNM');
+});
+
+test('parseInitialRankingsExcelBuffer and parseInitialRankingsCsv handle single/dual ratings, Swiss-Manager headers, titles, and unrated rows', () => {
+  const singleSample = generateSampleInitialRankingsExcelBytes(false);
+  const parsedSingle = parseInitialRankingsExcelBuffer(singleSample);
+  assert.equal(parsedSingle.errors.length, 0);
+  assert.equal(parsedSingle.usesDualRating, false);
+  assert.equal(parsedSingle.entries.length, 4);
+  assert.equal(parsedSingle.entries[0]?.name, 'Godfrid Harry Mollyson Siregar');
+  assert.equal(parsedSingle.entries[0]?.title, 'NM');
+  assert.equal(parsedSingle.entries[0]?.rating, 2243);
+  assert.equal(parsedSingle.entries[3]?.name, 'Wahyu Rizky Pratama');
+  assert.equal(parsedSingle.entries[3]?.rating, '-');
+
+  const dualSample = generateSampleInitialRankingsExcelBytes(true);
+  const parsedDual = parseInitialRankingsExcelBuffer(dualSample);
+  assert.equal(parsedDual.errors.length, 0);
+  assert.equal(parsedDual.usesDualRating, true);
+  assert.equal(parsedDual.entries.length, 4);
+  assert.equal(parsedDual.entries[2]?.nationalRating, 1896);
+  assert.equal(parsedDual.entries[2]?.internationalRating, 1875);
+  assert.equal(parsedDual.entries[3]?.nationalRating, '-');
+  assert.equal(parsedDual.entries[3]?.internationalRating, '-');
+
+  // Swiss-Manager export with banner rows above headers and comma-suffixed titles
+  const swissSheet = XLSX.utils.aoa_to_sheet([
+    ['Darwin Cup 2026 - Starting List'],
+    ['Updated 2026'],
+    ['S. No.', 'Name', 'Gender', 'N. Rtg', 'I. Rtg', 'FED', 'Club/City'],
+    [2, 'Suhandri, PM', 'L', 1992, 0, 'INA', 'KOCAK'],
+    [1, 'Godfrid Harry Mollyson Siregar, NM', 'Putra', 2243, '-', 'INA', 'Sagulung'],
+    [3, 'Rini Kartika', 'P', '-', '-', 'INA', 'Bengkong'],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, swissSheet, 'Starting List');
+  const xlsBytes = XLSX.write(wb, { bookType: 'biff8', type: 'array' }) as ArrayBuffer;
+
+  const parsedSwiss = parseInitialRankingsExcelBuffer(xlsBytes);
+  assert.equal(parsedSwiss.errors.length, 0);
+  assert.equal(parsedSwiss.usesDualRating, true);
+  assert.equal(parsedSwiss.entries.length, 3);
+  assert.equal(parsedSwiss.entries[0]?.sNo, 1);
+  assert.equal(parsedSwiss.entries[0]?.name, 'Godfrid Harry Mollyson Siregar');
+  assert.equal(parsedSwiss.entries[0]?.title, 'NM');
+  assert.equal(parsedSwiss.entries[1]?.name, 'Suhandri');
+  assert.equal(parsedSwiss.entries[1]?.title, 'MP');
+  assert.equal(parsedSwiss.entries[1]?.gender, 'Putra');
+  assert.equal(parsedSwiss.entries[1]?.internationalRating, '-');
+  assert.equal(parsedSwiss.entries[2]?.gender, 'Putri');
+  assert.equal(parsedSwiss.entries[2]?.nationalRating, '-');
+
+  const csvText = [
+    'S. No.;Nama;Rating;Klub/Kota',
+    '1;Godfrid Harry Mollyson Siregar, NM;2243;Sagulung',
+    '2;Wahyu Rizky Pratama;-;Bengkong',
+  ].join('\n');
+  const parsedCsv = parseInitialRankingsCsv(csvText);
+  assert.equal(parsedCsv.errors.length, 0);
+  assert.equal(parsedCsv.entries.length, 2);
+  assert.equal(parsedCsv.entries[0]?.title, 'NM');
+  assert.equal(parsedCsv.entries[0]?.rating, 2243);
+  assert.equal(parsedCsv.entries[1]?.rating, '-');
+});
+
+test('migratePortalData preserves custom Excel-uploaded initialRankings with <148 players on Darwin Cup 2026 and Firdaus Cup 2026', () => {
+  const uploaded = [
+    { sNo: 1, name: 'Excel Test Grandmaster', title: 'GM', gender: 'Putra', rating: 2510, fed: 'INA', clubCity: 'Batam Kota' },
+    { sNo: 2, name: 'Godfrid Harry Mollyson Siregar', title: 'NM', gender: 'Putra', rating: 2243, fed: 'INA', clubCity: 'Sagulung' },
+    { sNo: 3, name: 'Wahyu Rizky Pratama', gender: 'Putra', rating: '-' as const, fed: 'INA', clubCity: 'Bengkong' },
+  ];
+
+  const modified = {
+    ...SEED_PORTAL_DATA,
+    tournaments: SEED_PORTAL_DATA.tournaments.map((t) => ({
+      ...t,
+      initialRankings: uploaded,
+      participantsCount: Math.max(uploaded.length, t.standings.length),
+    })),
+  };
+
+  const migrated = migratePortalData(modified);
+  const firdaus = migrated.tournaments.find((t) => t.id === 'trn-kejurkot-2026');
+  const darwin = migrated.tournaments.find((t) => t.id === 'trn-darwin-cup-2026');
+  assert.equal(firdaus?.initialRankings?.length, 3);
+  assert.equal(firdaus?.initialRankings?.[0]?.name, 'Excel Test Grandmaster');
+  assert.equal(darwin?.initialRankings?.length, 3);
+  assert.equal(darwin?.initialRankings?.[0]?.name, 'Excel Test Grandmaster');
+  assert.equal(darwin?.participantsCount, 3);
+});
+
+

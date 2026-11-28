@@ -71,6 +71,7 @@ export default function App() {
   const [firebaseAdminUser, setFirebaseAdminUser] = useState<User | null>(null);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<ProjectSyncStatus>('idle');
+  const [syncErrorMessage, setSyncErrorMessage] = useState('');
 
   const cloudSnapshotRef = useRef<PortalData | null>(null);
   const portalDataRef = useRef<PortalData>(portalData);
@@ -217,9 +218,11 @@ export default function App() {
                   setPortalData(migratedCloud);
                 }
               }
+              setSyncErrorMessage('');
               setSyncStatus('cloud-synced');
             })
-            .catch(() => {
+            .catch((err) => {
+              setSyncErrorMessage(err instanceof Error ? err.message : 'Gagal menyinkronkan ke Cloud.');
               setSyncStatus('cloud-error');
             });
         })
@@ -230,15 +233,33 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  const formatCloudSyncError = (err: unknown): string => {
+    if (err instanceof Error) {
+      try {
+        const parsed = JSON.parse(err.message) as { error?: string };
+        if (parsed.error) return parsed.error;
+      } catch {
+        // plain error message
+      }
+      return err.message;
+    }
+    return 'Gagal menulis ke Cloud Firestore.';
+  };
+
   const commitPortalChange = (
     nextData: PortalData,
     options: { markLocalEdited?: boolean; tokenOverride?: string | null } = {}
   ) => {
     const { markLocalEdited = true, tokenOverride } = options;
-    const saved = savePortalData(nextData, markLocalEdited);
+    const saved = savePortalData(
+      nextData,
+      markLocalEdited,
+      cloudSnapshotRef.current?.updatedAt
+    );
     setPortalData(saved);
 
     if (firebaseAdminUser) {
+      setSyncErrorMessage('');
       setSyncStatus('cloud-syncing');
       void publishPortalDataToCloud(saved, cloudSnapshotRef.current, firebaseAdminUser)
         .then(() => {
@@ -246,7 +267,8 @@ export default function App() {
           savePortalData(saved, false);
           setSyncStatus('cloud-synced');
         })
-        .catch(() => {
+        .catch((err) => {
+          setSyncErrorMessage(formatCloudSyncError(err));
           setSyncStatus('cloud-error');
         });
       return;
@@ -261,6 +283,31 @@ export default function App() {
     } else {
       setSyncStatus('local-only');
     }
+  };
+
+  const handleForceCloudSync = () => {
+    if (!firebaseAdminUser) {
+      setAdminLoginOpen(true);
+      return;
+    }
+    const saved = savePortalData(
+      portalDataRef.current,
+      true,
+      cloudSnapshotRef.current?.updatedAt
+    );
+    setPortalData(saved);
+    setSyncErrorMessage('');
+    setSyncStatus('cloud-syncing');
+    void publishPortalDataToCloud(saved, null, firebaseAdminUser)
+      .then(() => {
+        cloudSnapshotRef.current = saved;
+        savePortalData(saved, false);
+        setSyncStatus('cloud-synced');
+      })
+      .catch((err) => {
+        setSyncErrorMessage(formatCloudSyncError(err));
+        setSyncStatus('cloud-error');
+      });
   };
 
   const handleNavigate = (section: NavSection) => {
@@ -342,6 +389,7 @@ export default function App() {
     setAdminToken(null);
     setFirebaseAdminUser(null);
     setSyncStatus('idle');
+    setSyncErrorMessage('');
     setMemberFormOpen(false);
     setUploadTournamentOpen(false);
     setEditingTournament(null);
@@ -498,8 +546,10 @@ export default function App() {
       {isAdminMode && (
         <AdminToolbar
           syncStatus={syncStatus}
+          syncErrorMessage={syncErrorMessage}
           isCloudAdmin={isCloudAdmin}
           onConnectCloudAdmin={() => setAdminLoginOpen(true)}
+          onForceCloudSync={handleForceCloudSync}
           onAddMember={handleOpenAddMember}
           onUploadTournament={handleOpenCreateTournament}
           onOpenBackup={() => setBackupOpen(true)}

@@ -1,8 +1,10 @@
 import * as XLSX from 'xlsx';
 import type {
+  ArbiterTitleCode,
   Athlete,
   AthleteCategory,
   BatamDistrict,
+  CoachTitleCode,
   InitialRankEntry,
   KepriCity,
   PortalData,
@@ -16,6 +18,8 @@ import type {
 export interface AthleteFilterOptions {
   query?: string;
   title?: TitleCode | 'Semua';
+  coachTitle?: CoachTitleCode | 'Semua';
+  arbiterTitle?: ArbiterTitleCode | 'Semua';
   category?: AthleteCategory | 'Semua';
   city?: KepriCity | 'Semua';
   district?: BatamDistrict | 'Semua';
@@ -36,6 +40,26 @@ export const TITLE_OPTIONS: TitleCode[] = [
   'AFM',
   'ACM',
   'Non-Gelar',
+];
+
+export const COACH_TITLE_OPTIONS: CoachTitleCode[] = [
+  'FST',
+  'FT',
+  'FI',
+  'NI',
+  'DI',
+  'PN',
+  'PNM',
+  'PNP',
+];
+
+export const ARBITER_TITLE_OPTIONS: ArbiterTitleCode[] = [
+  'IA',
+  'FA',
+  'NA',
+  'WN',
+  'WNM',
+  'WNP',
 ];
 
 export const CATEGORY_OPTIONS: AthleteCategory[] = [
@@ -183,6 +207,20 @@ export function filterAthletes(
       return false;
     }
     if (
+      options.coachTitle &&
+      options.coachTitle !== 'Semua' &&
+      athlete.coachTitle !== options.coachTitle
+    ) {
+      return false;
+    }
+    if (
+      options.arbiterTitle &&
+      options.arbiterTitle !== 'Semua' &&
+      athlete.arbiterTitle !== options.arbiterTitle
+    ) {
+      return false;
+    }
+    if (
       options.category &&
       options.category !== 'Semua' &&
       athlete.category !== options.category
@@ -206,6 +244,8 @@ export function filterAthletes(
         city,
         athlete.district !== '-' ? athlete.district : '',
         athlete.title,
+        athlete.coachTitle ?? '',
+        athlete.arbiterTitle ?? '',
       ]
         .join(' ')
         .toLowerCase();
@@ -1242,6 +1282,337 @@ export function generateSamplePairingsExcelBytes(roundNumber = 1): Uint8Array {
   return new Uint8Array(out);
 }
 
+export interface InitialRankingsParseResult {
+  entries: InitialRankEntry[];
+  usesDualRating: boolean;
+  errors: string[];
+}
+
+function parseInitialRankCellRating(raw: unknown): number | '-' {
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) && raw > 0 ? Math.round(raw) : '-';
+  }
+  const str = String(raw ?? '').trim();
+  if (!str || str === '-' || str === '0') return '-';
+  const num = Number.parseInt(str.replace(/[^\d]/g, ''), 10);
+  return Number.isFinite(num) && num > 0 ? num : '-';
+}
+
+function normalizeInitialRankGender(raw: unknown): string {
+  const s = String(raw ?? '').trim();
+  if (!s) return 'Putra';
+  const lower = s.toLowerCase();
+  if (['p', 'putri', 'f', 'female', 'w', 'woman', 'wanita', 'perempuan'].includes(lower)) {
+    return 'Putri';
+  }
+  if (['l', 'putra', 'm', 'male', 'pria', 'laki-laki', 'lakilaki'].includes(lower)) {
+    return 'Putra';
+  }
+  if (s === '-') return '-';
+  return s;
+}
+
+export function parseInitialRankingsMatrix(
+  rows: unknown[][]
+): InitialRankingsParseResult {
+  const nonEmptyRows = rows.filter((row) =>
+    row.some((cell) => String(cell ?? '').trim() !== '')
+  );
+
+  if (nonEmptyRows.length === 0) {
+    return {
+      entries: [],
+      usesDualRating: false,
+      errors: ['Berkas Excel/CSV peringkat awal kosong atau tidak memiliki baris data.'],
+    };
+  }
+
+  let headerRowIdx = nonEmptyRows.findIndex((row) => {
+    const tokens = row.map(normalizeHeaderToken);
+    const hasNameCol = tokens.some((t) =>
+      ['nama', 'name', 'pemain', 'player', 'namapemain'].includes(t)
+    );
+    const hasSeedOrMetricCol = tokens.some((t) =>
+      [
+        'sno',
+        'noawal',
+        'seed',
+        'startno',
+        'no',
+        'rating',
+        'rtg',
+        'nrtg',
+        'irtg',
+        'gender',
+        'fed',
+        'clubcity',
+        'club',
+        'klub',
+        'gelar',
+        'title',
+      ].includes(t)
+    );
+    return hasNameCol && hasSeedOrMetricCol;
+  });
+
+  const hasHeaderRow = headerRowIdx >= 0;
+  if (headerRowIdx < 0) {
+    headerRowIdx = 0;
+  }
+
+  const headers = nonEmptyRows[headerRowIdx].map(normalizeHeaderToken);
+
+  const findExactOrPartialIdx = (
+    exactList: string[],
+    partialList: string[],
+    fallback: number
+  ): number => {
+    if (!hasHeaderRow) return fallback;
+    const exactIdx = headers.findIndex((h) => exactList.includes(h));
+    if (exactIdx >= 0) return exactIdx;
+    const partialIdx = headers.findIndex((h) =>
+      partialList.some((p) => h.includes(p))
+    );
+    return partialIdx >= 0 ? partialIdx : -1;
+  };
+
+  const sNoIdx = findExactOrPartialIdx(
+    ['sno', 'noawal', 'seed', 'startno', 'no'],
+    ['sno', 'noawal', 'seed'],
+    0
+  );
+  const titleIdx = findExactOrPartialIdx(['gelar', 'title', 'tit'], ['gelar', 'title'], -1);
+  const nameIdx = findExactOrPartialIdx(
+    ['nama', 'name', 'pemain', 'player', 'namapemain'],
+    ['nama', 'name', 'pemain', 'player'],
+    1
+  );
+  const genderIdx = findExactOrPartialIdx(
+    ['gender', 'jeniskelamin', 'jk', 'kelamin', 'sex', 'putraputri'],
+    ['gender', 'kelamin'],
+    -1
+  );
+  const natRatingIdx = findExactOrPartialIdx(
+    ['nrtg', 'nationalrating', 'ratingnasional', 'rtgnas'],
+    ['nrtg', 'nationalrating', 'ratingnasional'],
+    -1
+  );
+  const intlRatingIdx = findExactOrPartialIdx(
+    ['irtg', 'internationalrating', 'ratinginternasional', 'fidertg', 'fiderating'],
+    ['irtg', 'internationalrating', 'ratinginternasional'],
+    -1
+  );
+  const ratingIdx = findExactOrPartialIdx(
+    ['rating', 'rtg', 'elo'],
+    ['rating', 'rtg'],
+    hasHeaderRow ? -1 : 3
+  );
+  const fedIdx = findExactOrPartialIdx(['fed', 'federasi', 'negara'], ['fed'], -1);
+  const clubIdx = findExactOrPartialIdx(
+    ['clubcity', 'klubkota', 'club', 'klub', 'city', 'kota', 'kecamatan', 'asal'],
+    ['clubcity', 'club', 'klub', 'city', 'kota', 'kecamatan'],
+    hasHeaderRow ? -1 : 5
+  );
+  const categoryIdx = findExactOrPartialIdx(
+    ['category', 'kategori', 'kat'],
+    ['category', 'kategori'],
+    -1
+  );
+
+  const usesDualRating = natRatingIdx >= 0 || intlRatingIdx >= 0;
+
+  const dataRows = hasHeaderRow
+    ? nonEmptyRows.slice(headerRowIdx + 1)
+    : nonEmptyRows;
+
+  if (dataRows.length === 0) {
+    return {
+      entries: [],
+      usesDualRating,
+      errors: ['Berkas hanya berisi judul kolom tanpa daftar pemain peringkat awal.'],
+    };
+  }
+
+  const entries: InitialRankEntry[] = [];
+  const errors: string[] = [];
+
+  dataRows.forEach((cols, idx) => {
+    const rowNumber = headerRowIdx + idx + (hasHeaderRow ? 2 : 1);
+    const rawName = nameIdx >= 0 ? String(cols[nameIdx] ?? '').trim() : '';
+
+    if (!rawName) {
+      const firstCellLower = String(cols[0] ?? '').trim().toLowerCase();
+      if (
+        !firstCellLower ||
+        firstCellLower.startsWith('chess-results') ||
+        firstCellLower.startsWith('program') ||
+        firstCellLower.startsWith('notes')
+      ) {
+        return;
+      }
+      errors.push(`Baris ${rowNumber}: Nama pemain wajib diisi.`);
+      return;
+    }
+
+    const firstCellLower = String(cols[0] ?? '').trim().toLowerCase();
+    if (
+      firstCellLower.startsWith('chess-results') ||
+      firstCellLower.startsWith('program')
+    ) {
+      return;
+    }
+
+    const parsedSNo =
+      sNoIdx >= 0 ? parseOptionalInt(cols[sNoIdx]) : undefined;
+    const sNo = parsedSNo && parsedSNo >= 1 ? parsedSNo : entries.length + 1;
+    const rawTitle = titleIdx >= 0 ? String(cols[titleIdx] ?? '').trim() : undefined;
+    const resolvedTitle = resolvePlayerMasterTitle(rawName, [], rawTitle);
+    const cleanName = stripTitleSuffix(rawName) || rawName;
+    const gender =
+      genderIdx >= 0 ? normalizeInitialRankGender(cols[genderIdx]) : 'Putra';
+    const fed =
+      fedIdx >= 0
+        ? String(cols[fedIdx] ?? '').trim().toUpperCase() || 'INA'
+        : 'INA';
+    const clubCity =
+      clubIdx >= 0 ? String(cols[clubIdx] ?? '').trim() || '-' : '-';
+    const category =
+      categoryIdx >= 0 ? String(cols[categoryIdx] ?? '').trim() || undefined : undefined;
+
+    const entry: InitialRankEntry = {
+      sNo,
+      name: cleanName,
+      gender,
+      fed,
+      clubCity,
+      ...(resolvedTitle ? { title: resolvedTitle } : {}),
+      ...(category ? { category } : {}),
+    };
+
+    if (usesDualRating) {
+      entry.nationalRating =
+        natRatingIdx >= 0
+          ? parseInitialRankCellRating(cols[natRatingIdx])
+          : ratingIdx >= 0
+            ? parseInitialRankCellRating(cols[ratingIdx])
+            : '-';
+      entry.internationalRating =
+        intlRatingIdx >= 0
+          ? parseInitialRankCellRating(cols[intlRatingIdx])
+          : '-';
+    } else {
+      entry.rating =
+        ratingIdx >= 0 ? parseInitialRankCellRating(cols[ratingIdx]) : '-';
+    }
+
+    entries.push(entry);
+  });
+
+  if (entries.length === 0 && errors.length === 0) {
+    errors.push('Tidak ditemukan data pemain yang valid dalam berkas peringkat awal.');
+  }
+
+  entries.sort((a, b) => a.sNo - b.sNo);
+  return { entries, usesDualRating, errors };
+}
+
+export function parseInitialRankingsCsv(
+  csvText: string
+): InitialRankingsParseResult {
+  const rawLines = csvText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (rawLines.length === 0) {
+    return {
+      entries: [],
+      usesDualRating: false,
+      errors: ['Berkas CSV peringkat awal kosong atau tidak memiliki baris data.'],
+    };
+  }
+
+  const headerLine = rawLines[0];
+  const commaCount = (headerLine.match(/,/g) ?? []).length;
+  const semiCount = (headerLine.match(/;/g) ?? []).length;
+  const delimiter = semiCount > commaCount ? ';' : ',';
+  const matrix = rawLines.map((line) => splitDelimitedLine(line, delimiter));
+  return parseInitialRankingsMatrix(matrix);
+}
+
+export function parseInitialRankingsExcelBuffer(
+  data: ArrayBuffer | Uint8Array
+): InitialRankingsParseResult {
+  try {
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    if (bytes.byteLength === 0) {
+      return {
+        entries: [],
+        usesDualRating: false,
+        errors: ['Berkas Excel peringkat awal kosong atau berukuran 0 byte.'],
+      };
+    }
+
+    const workbook = XLSX.read(bytes, { type: 'array' });
+    if (workbook.SheetNames.length === 0) {
+      return {
+        entries: [],
+        usesDualRating: false,
+        errors: ['Berkas Excel tidak memiliki lembar kerja (worksheet).'],
+      };
+    }
+
+    const preferredSheetName =
+      workbook.SheetNames.find((name) =>
+        /peringkat|initial|starting|peserta|seed|player/i.test(name)
+      ) ?? workbook.SheetNames[0];
+
+    const worksheet = workbook.Sheets[preferredSheetName];
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+      header: 1,
+      raw: true,
+      defval: '',
+    });
+
+    return parseInitialRankingsMatrix(rows);
+  } catch {
+    return {
+      entries: [],
+      usesDualRating: false,
+      errors: [
+        'Berkas Excel (.xls / .xlsx) tidak dapat dibaca. Pastikan format file valid.',
+      ],
+    };
+  }
+}
+
+export function generateSampleInitialRankingsExcelBytes(
+  useDualRating = false
+): Uint8Array {
+  const aoa = useDualRating
+    ? [
+        ['S. No.', 'Gelar', 'Name', 'Gender', 'N. Rtg', 'I. Rtg', 'FED', 'Club/City'],
+        [1, 'NM', 'Godfrid Harry Mollyson Siregar', 'Putra', 2243, '-', 'INA', 'Sagulung'],
+        [2, 'MP', 'Suhandri', 'Putra', 1992, '-', 'INA', 'KOCAK'],
+        [3, '', 'Jonathan Charmian Vivaldy', 'Putra', 1896, 1875, 'INA', 'Semanggi'],
+        [4, '', 'Wahyu Rizky Pratama', 'Putra', '-', '-', 'INA', 'Bengkong'],
+      ]
+    : [
+        ['S. No.', 'Gelar', 'Name', 'Gender', 'Rating', 'FED', 'Club/City'],
+        [1, 'NM', 'Godfrid Harry Mollyson Siregar', 'Putra', 2243, 'INA', 'Sagulung'],
+        [2, 'MP', 'Suhandri', 'Putra', 1992, 'INA', 'KOCAK'],
+        [3, '', 'Jonathan Charmian Vivaldy', 'Putra', 1896, 'INA', 'Semanggi'],
+        [4, '', 'Wahyu Rizky Pratama', 'Putra', '-', 'INA', 'Bengkong'],
+      ];
+  const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Peringkat Awal');
+  const out = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  return new Uint8Array(out);
+}
+
 export interface BackupValidationResult {
   valid: boolean;
   data?: PortalData;
@@ -1331,6 +1702,8 @@ export interface AthleteDetailProfile {
   key: string;
   fullName: string;
   title: string;
+  coachTitle?: string;
+  arbiterTitle?: string;
   fed?: string;
   category: string;
   club: string;
@@ -1807,6 +2180,8 @@ export function buildAthleteDetailProfile(
     key: targetKey,
     fullName: registeredAthlete?.fullName ?? fallbackDisplayName,
     title: fallbackTitle,
+    coachTitle: registeredAthlete?.coachTitle,
+    arbiterTitle: registeredAthlete?.arbiterTitle,
     fed: matchedStanding?.fed ?? matchedInitial?.fed ?? (registeredAthlete ? 'INA' : undefined),
     category:
       registeredAthlete?.category ??

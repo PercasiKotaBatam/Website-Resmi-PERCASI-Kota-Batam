@@ -13,9 +13,13 @@ import {
   getDoc,
   getDocFromServer,
   getDocs,
+  getDocsFromServer,
   getFirestore,
   onSnapshot,
   writeBatch,
+  type CollectionReference,
+  type DocumentData,
+  type DocumentReference,
   type Unsubscribe,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -123,6 +127,24 @@ const VALID_TITLES = new Set([
   'ACM',
   'Non-Gelar',
 ]);
+const VALID_COACH_TITLES = new Set([
+  'FST',
+  'FT',
+  'FI',
+  'NI',
+  'DI',
+  'PN',
+  'PNM',
+  'PNP',
+]);
+const VALID_ARBITER_TITLES = new Set([
+  'IA',
+  'FA',
+  'NA',
+  'WN',
+  'WNM',
+  'WNP',
+]);
 const VALID_CATEGORIES = new Set([
   'Senior Putra',
   'Senior Putri',
@@ -169,6 +191,12 @@ export function sanitizeAthleteForFirestore(athlete: Athlete): Athlete {
       : [],
   };
 
+  if (rest.coachTitle && VALID_COACH_TITLES.has(rest.coachTitle)) {
+    sanitized.coachTitle = rest.coachTitle;
+  }
+  if (rest.arbiterTitle && VALID_ARBITER_TITLES.has(rest.arbiterTitle)) {
+    sanitized.arbiterTitle = rest.arbiterTitle;
+  }
   if (rest.birthDate && rest.birthDate.trim()) {
     sanitized.birthDate = rest.birthDate.trim().slice(0, 32);
   }
@@ -294,6 +322,14 @@ export async function signInWithGoogleAdmin(): Promise<
         error: 'Jendela login Google ditutup sebelum proses selesai.',
       };
     }
+    if (err.code === 'auth/popup-blocked') {
+      return {
+        ok: false,
+        code: err.code,
+        error:
+          'Popup login Google diblokir oleh peramban. Izinkan pop-up untuk situs ini lalu coba masuk lagi.',
+      };
+    }
     if (err.code === 'auth/unauthorized-domain') {
       const host = typeof window !== 'undefined' ? window.location.hostname : 'domain ini';
       return {
@@ -324,11 +360,45 @@ export function subscribeFirebaseAuthState(
   return onAuthStateChanged(auth, callback);
 }
 
+async function getDocFresh(ref: DocumentReference<DocumentData>) {
+  try {
+    return await getDocFromServer(ref);
+  } catch (err) {
+    const code = (err as { code?: string })?.code || '';
+    const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+    if (
+      code === 'unavailable' ||
+      msg.includes('offline') ||
+      msg.includes('failed to get document from server')
+    ) {
+      return await getDoc(ref);
+    }
+    throw err;
+  }
+}
+
+async function getDocsFresh(colRef: CollectionReference<DocumentData>) {
+  try {
+    return await getDocsFromServer(colRef);
+  } catch (err) {
+    const code = (err as { code?: string })?.code || '';
+    const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+    if (
+      code === 'unavailable' ||
+      msg.includes('offline') ||
+      msg.includes('failed to get')
+    ) {
+      return await getDocs(colRef);
+    }
+    throw err;
+  }
+}
+
 export async function fetchCloudPortalData(): Promise<PortalData | null> {
   const metaPath = 'portalMeta/state';
   let metaSnap;
   try {
-    metaSnap = await getDoc(doc(db, 'portalMeta', 'state'));
+    metaSnap = await getDocFresh(doc(db, 'portalMeta', 'state'));
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, metaPath);
   }
@@ -340,21 +410,21 @@ export async function fetchCloudPortalData(): Promise<PortalData | null> {
   const meta = metaSnap.data() as Partial<CloudPortalMetaDoc>;
   let athletesSnap;
   try {
-    athletesSnap = await getDocs(collection(db, 'athletes'));
+    athletesSnap = await getDocsFresh(collection(db, 'athletes'));
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'athletes');
   }
 
   let tournamentsSnap;
   try {
-    tournamentsSnap = await getDocs(collection(db, 'tournaments'));
+    tournamentsSnap = await getDocsFresh(collection(db, 'tournaments'));
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'tournaments');
   }
 
   let newsSnap;
   try {
-    newsSnap = await getDocs(collection(db, 'news'));
+    newsSnap = await getDocsFresh(collection(db, 'news'));
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'news');
   }
@@ -566,7 +636,7 @@ export async function bootstrapCloudIfEmpty(
 ): Promise<{ seeded: boolean; cloudData: PortalData | null }> {
   let metaSnap;
   try {
-    metaSnap = await getDoc(doc(db, 'portalMeta', 'state'));
+    metaSnap = await getDocFresh(doc(db, 'portalMeta', 'state'));
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'portalMeta/state');
   }

@@ -1,15 +1,19 @@
 import { Upload, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type {
+  ArbiterTitleCode,
   Athlete,
   AthleteCategory,
   BatamDistrict,
+  CoachTitleCode,
   KepriCity,
   TitleCode,
 } from '../types/chess';
 import {
+  ARBITER_TITLE_OPTIONS,
   CATEGORY_OPTIONS,
   CITY_OPTIONS,
+  COACH_TITLE_OPTIONS,
   DISTRICT_OPTIONS,
   TITLE_OPTIONS,
   calculateAthleteAge,
@@ -33,6 +37,8 @@ export function MemberFormModal({
 }: MemberFormModalProps) {
   const [fullName, setFullName] = useState('');
   const [title, setTitle] = useState<TitleCode>('Non-Gelar');
+  const [coachTitle, setCoachTitle] = useState<CoachTitleCode | ''>('');
+  const [arbiterTitle, setArbiterTitle] = useState<ArbiterTitleCode | ''>('');
   const [category, setCategory] = useState<AthleteCategory>('Senior Putra');
   const [gender, setGender] = useState<'Putra' | 'Putri'>('Putra');
   const [birthDate, setBirthDate] = useState('');
@@ -54,6 +60,8 @@ export function MemberFormModal({
       const resolvedCity = getAthleteCity(editingAthlete);
       setFullName(editingAthlete.fullName);
       setTitle(editingAthlete.title);
+      setCoachTitle(editingAthlete.coachTitle ?? '');
+      setArbiterTitle(editingAthlete.arbiterTitle ?? '');
       setCategory(editingAthlete.category);
       setGender(editingAthlete.gender);
       setBirthDate(editingAthlete.birthDate ?? '');
@@ -75,6 +83,8 @@ export function MemberFormModal({
     } else {
       setFullName('');
       setTitle('Non-Gelar');
+      setCoachTitle('');
+      setArbiterTitle('');
       setCategory('Senior Putra');
       setGender('Putra');
       setBirthDate('');
@@ -174,6 +184,8 @@ export function MemberFormModal({
       id: editingAthlete?.id ?? `ath-${Date.now()}`,
       fullName: trimmedName,
       title,
+      ...(coachTitle ? { coachTitle } : {}),
+      ...(arbiterTitle ? { arbiterTitle } : {}),
       category,
       gender,
       ...(trimmedBirthDate ? { birthDate: trimmedBirthDate } : {}),
@@ -321,7 +333,7 @@ export function MemberFormModal({
                 htmlFor="member-title"
                 className="mb-1 block text-xs font-semibold text-slate-700"
               >
-                Gelar Catur
+                Gelar Catur (Pemain)
               </label>
               <select
                 id="member-title"
@@ -332,6 +344,50 @@ export function MemberFormModal({
                 {TITLE_OPTIONS.map((t) => (
                   <option key={t} value={t}>
                     {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="member-coach-title"
+                className="mb-1 block text-xs font-semibold text-slate-700"
+              >
+                Gelar Pelatih
+              </label>
+              <select
+                id="member-coach-title"
+                value={coachTitle}
+                onChange={(e) => setCoachTitle(e.target.value as CoachTitleCode | '')}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-[#0F2342] focus:outline-none"
+              >
+                <option value="">Tidak Ada</option>
+                {COACH_TITLE_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="member-arbiter-title"
+                className="mb-1 block text-xs font-semibold text-slate-700"
+              >
+                Gelar Wasit
+              </label>
+              <select
+                id="member-arbiter-title"
+                value={arbiterTitle}
+                onChange={(e) => setArbiterTitle(e.target.value as ArbiterTitleCode | '')}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-[#0F2342] focus:outline-none"
+              >
+                <option value="">Tidak Ada</option>
+                {ARBITER_TITLE_OPTIONS.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
                   </option>
                 ))}
               </select>

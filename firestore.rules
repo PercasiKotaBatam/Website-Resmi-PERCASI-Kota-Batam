@@ -64,13 +64,15 @@ service cloud.firestore {
           'club', 'district', 'ratings', 'bio', 'federationStatus', 'tournamentHistory'
         ])
         && data.keys().hasOnly([
-          'id', 'fullName', 'title', 'category', 'gender',
+          'id', 'fullName', 'title', 'coachTitle', 'arbiterTitle', 'category', 'gender',
           'birthDate', 'birthYear', 'club', 'city', 'district',
           'photoUrl', 'ratings', 'bio', 'federationStatus', 'tournamentHistory'
         ])
         && data.id is string && data.id == athleteId && isValidId(data.id)
         && data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 160
         && data.title in ['GM', 'IM', 'FM', 'WFM', 'NM', 'MP', 'AGM', 'AIM', 'AFM', 'ACM', 'Non-Gelar']
+        && (!('coachTitle' in data) || data.coachTitle in ['FST', 'FT', 'FI', 'NI', 'DI', 'PN', 'PNM', 'PNP'])
+        && (!('arbiterTitle' in data) || data.arbiterTitle in ['IA', 'FA', 'NA', 'WN', 'WNM', 'WNP'])
         && data.category in ['Senior Putra', 'Senior Putri', 'Junior U-18', 'Junior U-14', 'Veteran']
         && data.gender in ['Putra', 'Putri']
         && (!('birthDate' in data) || (data.birthDate is string && data.birthDate.size() <= 32))
@@ -152,7 +154,7 @@ service cloud.firestore {
     // Global portal sync metadata
     match /portalMeta/{metaId} {
       allow get: if isValidId(metaId);
-      allow list: if resource.data.version is string;
+      allow list: if true;
       allow create: if isAdmin() && isValidPortalMeta(incoming(), metaId);
       allow update: if isAdmin()
         && isValidPortalMeta(incoming(), metaId)
@@ -163,13 +165,13 @@ service cloud.firestore {
     // Public sports athlete directory (writable only by verified admin)
     match /athletes/{athleteId} {
       allow get: if isValidId(athleteId);
-      allow list: if resource.data.id is string;
+      allow list: if true;
       allow create: if isAdmin() && isValidAthlete(incoming(), athleteId);
       allow update: if isAdmin()
         && isValidAthlete(incoming(), athleteId)
         && incoming().id == existing().id
         && incoming().diff(existing()).affectedKeys().hasOnly([
-          'fullName', 'title', 'category', 'gender',
+          'fullName', 'title', 'coachTitle', 'arbiterTitle', 'category', 'gender',
           'birthDate', 'birthYear', 'club', 'city', 'district',
           'photoUrl', 'ratings', 'bio', 'federationStatus', 'tournamentHistory'
         ]);
@@ -179,7 +181,7 @@ service cloud.firestore {
     // Public tournament standings, initial rankings, and round pairings (writable only by verified admin)
     match /tournaments/{tournamentId} {
       allow get: if isValidId(tournamentId);
-      allow list: if resource.data.id is string;
+      allow list: if true;
       allow create: if isAdmin() && isValidTournament(incoming(), tournamentId);
       allow update: if isAdmin()
         && isValidTournament(incoming(), tournamentId)
@@ -196,7 +198,7 @@ service cloud.firestore {
     // Public news articles (writable only by verified admin)
     match /news/{newsId} {
       allow get: if isValidId(newsId);
-      allow list: if resource.data.id is string;
+      allow list: if true;
       allow create: if isAdmin() && isValidNewsArticle(incoming(), newsId);
       allow update: if isAdmin()
         && isValidNewsArticle(incoming(), newsId)

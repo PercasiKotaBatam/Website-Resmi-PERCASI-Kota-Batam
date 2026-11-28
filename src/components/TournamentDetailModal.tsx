@@ -18,9 +18,12 @@ import {
   buildInitialRankings,
   filterPairingsByRound,
   formatRatingDelta,
+  generateSampleInitialRankingsExcelBytes,
   generateSamplePairingsExcelBytes,
   getPlayerDisplayParts,
   mergeRoundPairings,
+  parseInitialRankingsCsv,
+  parseInitialRankingsExcelBuffer,
   parsePairingsCsv,
   parsePairingsExcelBuffer,
   resolvePlayerMasterTitle,
@@ -144,8 +147,13 @@ export function TournamentDetailModal({
   const [selectedRound, setSelectedRound] = useState<number | 'all'>(1);
   const [editingInitialRank, setEditingInitialRank] = useState(false);
   const [draftInitialRows, setDraftInitialRows] = useState<EditableInitialRankRow[]>([]);
+  const [draftDualRatingCols, setDraftDualRatingCols] = useState(false);
   const [initialEditQuery, setInitialEditQuery] = useState('');
   const [initialEditError, setInitialEditError] = useState('');
+  const [initialUploadFeedback, setInitialUploadFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [uploadTargetRound, setUploadTargetRound] = useState<number | 'auto'>(1);
   const [pairingUploadFeedback, setPairingUploadFeedback] = useState<{
     type: 'success' | 'error';
@@ -174,6 +182,7 @@ export function TournamentDetailModal({
     setEditingInitialRank(false);
     setInitialEditQuery('');
     setInitialEditError('');
+    setInitialUploadFeedback(null);
     setPairingUploadFeedback(null);
   }, [tournament?.id]);
 
@@ -181,6 +190,7 @@ export function TournamentDetailModal({
     if (!isAdminMode) {
       setEditingInitialRank(false);
       setInitialEditError('');
+      setInitialUploadFeedback(null);
       setPairingUploadFeedback(null);
     }
   }, [isAdminMode]);
@@ -556,9 +566,103 @@ export function TournamentDetailModal({
                     toEditableInitialRankRow(entry, idx, athletes)
                   )
                 );
+                setDraftDualRatingCols(hasDualRatingInitialCols);
                 setInitialEditQuery('');
                 setInitialEditError('');
+                setInitialUploadFeedback(null);
                 setEditingInitialRank(true);
+              };
+
+              const handleDownloadInitialTemplate = () => {
+                const useDual = editingInitialRank
+                  ? draftDualRatingCols
+                  : hasDualRatingInitialCols;
+                downloadBinaryFile(
+                  `template-peringkat-awal-${tournament.id || 'turnamen'}.xlsx`,
+                  generateSampleInitialRankingsExcelBytes(useDual),
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                );
+              };
+
+              const handleUploadInitialRankingsFile = async (
+                e: React.ChangeEvent<HTMLInputElement>,
+                applyMode: 'save' | 'draft'
+              ) => {
+                const file = e.target.files?.[0];
+                if (!file || !onUpdateTournament) return;
+                const lower = file.name.toLowerCase();
+
+                try {
+                  const result =
+                    lower.endsWith('.xls') || lower.endsWith('.xlsx')
+                      ? parseInitialRankingsExcelBuffer(await file.arrayBuffer())
+                      : parseInitialRankingsCsv(await file.text());
+
+                  if (result.entries.length === 0) {
+                    const errMsg =
+                      result.errors[0] ||
+                      'Tidak ada data pemain peringkat awal valid ditemukan dalam berkas tersebut.';
+                    if (applyMode === 'draft') {
+                      setInitialEditError(errMsg);
+                    } else {
+                      setInitialUploadFeedback({ type: 'error', message: errMsg });
+                    }
+                    return;
+                  }
+
+                  const enrichedEntries = result.entries.map((entry) => {
+                    const resolvedTitle = resolvePlayerMasterTitle(
+                      entry.name,
+                      athletes,
+                      entry.title
+                    );
+                    return {
+                      ...entry,
+                      name: stripTitleSuffix(entry.name),
+                      ...(resolvedTitle ? { title: resolvedTitle } : {}),
+                    };
+                  });
+
+                  if (applyMode === 'draft') {
+                    setDraftDualRatingCols(result.usesDualRating);
+                    setDraftInitialRows(
+                      enrichedEntries.map((entry, idx) =>
+                        toEditableInitialRankRow(entry, idx, athletes)
+                      )
+                    );
+                    setInitialEditQuery('');
+                    setInitialEditError('');
+                    setInitialUploadFeedback({
+                      type: 'success',
+                      message: `Berhasil memuat ${enrichedEntries.length} pemain dari ${file.name}. Klik "Simpan Peringkat Awal" untuk menyimpan.`,
+                    });
+                    return;
+                  }
+
+                  const updatedTournament: Tournament = {
+                    ...tournament,
+                    initialRankings: enrichedEntries,
+                    participantsCount: Math.max(
+                      enrichedEntries.length,
+                      tournament.standings.length
+                    ),
+                  };
+                  onUpdateTournament(updatedTournament);
+                  setInitialEditError('');
+                  setInitialUploadFeedback({
+                    type: 'success',
+                    message: `Berhasil memperbarui ${enrichedEntries.length} pemain peringkat awal dari ${file.name}.`,
+                  });
+                } catch {
+                  const msg = 'Gagal membaca berkas Excel/CSV peringkat awal.';
+                  if (applyMode === 'draft') {
+                    setInitialEditError(msg);
+                  } else {
+                    setInitialUploadFeedback({ type: 'error', message: msg });
+                  }
+                } finally {
+                  e.target.value = '';
+                }
               };
 
               const handleAddInitialRow = () => {
@@ -584,7 +688,7 @@ export function TournamentDetailModal({
 
               const handleSortDraftRows = () => {
                 const converted = draftInitialRows.map((row, idx) =>
-                  fromEditableInitialRankRow(row, idx, hasDualRatingInitialCols)
+                  fromEditableInitialRankRow(row, idx, draftDualRatingCols)
                 );
                 const sorted = sortInitialRankings(converted);
                 setDraftInitialRows(
@@ -625,7 +729,7 @@ export function TournamentDetailModal({
                   return;
                 }
                 const savedEntries = draftInitialRows.map((row, idx) =>
-                  fromEditableInitialRankRow(row, idx, hasDualRatingInitialCols)
+                  fromEditableInitialRankRow(row, idx, draftDualRatingCols)
                 );
                 const updatedTournament: Tournament = {
                   ...tournament,
@@ -639,6 +743,10 @@ export function TournamentDetailModal({
                 setEditingInitialRank(false);
                 setInitialEditQuery('');
                 setInitialEditError('');
+                setInitialUploadFeedback({
+                  type: 'success',
+                  message: `Perubahan ${savedEntries.length} pemain peringkat awal telah disimpan.`,
+                });
               };
 
               if (editingInitialRank && canEditInitialRank) {
@@ -650,10 +758,28 @@ export function TournamentDetailModal({
                           Edit Daftar Peringkat Awal ({draftInitialRows.length} pemain)
                         </p>
                         <p className="text-[11px] text-amber-900">
-                          Ubah nama, klub/kecamatan, atau rating pemain. Kosongkan atau isi &quot;-&quot; jika tanpa rating.
+                          Edit manual, tambah pemain, atau impor langsung dari file Excel (.xlsx/.xls) / CSV.
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
+                        <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-[#0F2342] bg-white px-3 text-xs font-bold text-[#0F2342] hover:bg-slate-100 whitespace-nowrap">
+                          <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Impor Excel / CSV</span>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv,.txt"
+                            onChange={(e) => void handleUploadInitialRankingsFile(e, 'draft')}
+                            className="sr-only"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleDownloadInitialTemplate}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 whitespace-nowrap"
+                        >
+                          <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Template Excel</span>
+                        </button>
                         <button
                           type="button"
                           onClick={handleAddInitialRow}
@@ -690,6 +816,19 @@ export function TournamentDetailModal({
                         </button>
                       </div>
                     </div>
+
+                    {initialUploadFeedback && (
+                      <div
+                        role={initialUploadFeedback.type === 'error' ? 'alert' : 'status'}
+                        className={`rounded-md border px-3.5 py-2.5 text-xs font-semibold ${
+                          initialUploadFeedback.type === 'error'
+                            ? 'border-red-200 bg-red-50 text-[#B91C1C]'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                        }`}
+                      >
+                        {initialUploadFeedback.message}
+                      </div>
+                    )}
 
                     {initialEditError && (
                       <div
@@ -729,7 +868,7 @@ export function TournamentDetailModal({
                               <th scope="col" className="w-24 px-2 py-2.5">
                                 Gender
                               </th>
-                              {hasDualRatingInitialCols ? (
+                              {draftDualRatingCols ? (
                                 <>
                                   <th scope="col" className="w-24 px-2 py-2.5">
                                     N. Rtg
@@ -795,7 +934,7 @@ export function TournamentDetailModal({
                                     <option value="-">-</option>
                                   </select>
                                 </td>
-                                {hasDualRatingInitialCols ? (
+                                {draftDualRatingCols ? (
                                   <>
                                     <td className="px-2 py-1.5">
                                       <input
@@ -890,18 +1029,59 @@ export function TournamentDetailModal({
               return (
                 <div className="space-y-3">
                   {canEditInitialRank && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5">
-                      <p className="text-xs font-medium text-slate-600">
-                        Mode Admin aktif: Anda dapat mengubah, menambah, atau mengurutkan daftar peringkat awal.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={startEditingInitialRank}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#0F2342] bg-white px-3 text-xs font-bold text-[#0F2342] hover:bg-slate-100 whitespace-nowrap"
-                      >
-                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>Edit Peringkat Awal</span>
-                      </button>
+                    <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/70 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-extrabold text-[#0F2342]">
+                            Kelola Peringkat Awal (Upload Excel / Edit Manual)
+                          </p>
+                          <p className="text-[11px] text-slate-600">
+                            Unggah berkas Excel (.xlsx/.xls) atau CSV untuk mengganti daftar peringkat awal turnamen ini secara langsung tanpa mengetik satu per satu.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDownloadInitialTemplate}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 whitespace-nowrap"
+                        >
+                          <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Unduh Template Excel</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-[#0F2342] px-3.5 text-xs font-bold text-white hover:bg-[#173360] whitespace-nowrap">
+                          <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Upload Excel Peringkat Awal</span>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv,.txt"
+                            onChange={(e) => void handleUploadInitialRankingsFile(e, 'save')}
+                            className="sr-only"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={startEditingInitialRank}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#0F2342] bg-white px-3 text-xs font-bold text-[#0F2342] hover:bg-slate-100 whitespace-nowrap"
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Edit Peringkat Awal</span>
+                        </button>
+                      </div>
+
+                      {initialUploadFeedback && (
+                        <div
+                          role={initialUploadFeedback.type === 'error' ? 'alert' : 'status'}
+                          className={`rounded-md border px-3 py-2 text-xs font-semibold ${
+                            initialUploadFeedback.type === 'error'
+                              ? 'border-red-200 bg-red-50 text-[#B91C1C]'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                          }`}
+                        >
+                          {initialUploadFeedback.message}
+                        </div>
+                      )}
                     </div>
                   )}
 

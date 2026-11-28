@@ -244,7 +244,7 @@ export function TournamentDetailModal({
         aria-modal="true"
         aria-labelledby="tournament-detail-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"
+        className="relative max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <div className="flex items-center gap-3">
@@ -362,107 +362,153 @@ export function TournamentDetailModal({
                 Data klasemen belum dipublikasikan untuk turnamen ini.
               </div>
             ) : tournament.standings.some((row) => row.sNo !== undefined) ? (
-              <div className="overflow-hidden rounded-md border border-slate-200">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[780px] border-collapse text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
-                        <th scope="col" className="w-12 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          Rank
-                        </th>
-                        <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          S. No.
-                        </th>
-                        <th scope="col" className="px-3 py-2.5">
-                          Name
-                        </th>
-                        <th scope="col" className="w-16 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          Rating
-                        </th>
-                        <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          FED
-                        </th>
-                        <th scope="col" className="w-20 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          Category
-                        </th>
-                        <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          Pts.
-                        </th>
-                        <th scope="col" className="w-12 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          DE
-                        </th>
-                        <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          BH
-                        </th>
-                        <th scope="col" className="w-16 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          SB
-                        </th>
-                        <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
-                          PS
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {tournament.standings.map((row) => {
-                        const { displayName, masterTitle } = getPlayerDisplayParts(
-                          row.name,
-                          athletes,
-                          row.title
-                        );
-                        return (
-                        <tr
-                          key={`${row.rank}-${row.name}`}
-                          className="hover:bg-slate-50"
-                        >
-                          <td className="font-mono-tabular px-2.5 py-2 text-center font-bold text-[#0F2342]">
-                            {row.rank}
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-600">
-                            {row.sNo ?? '-'}
-                          </td>
-                          <td className="px-3 py-2 font-semibold text-slate-900">
-                            <div className="flex items-center gap-1.5">
-                              {masterTitle && <TitleBadge title={masterTitle} />}
-                              <button
-                                type="button"
-                                onClick={() => onSelectAthlete(row.name, tournament.id)}
-                                className="text-left font-semibold text-slate-900 hover:text-[#0F2342] hover:underline"
+              (() => {
+                const hasCategoryCol = tournament.standings.some((row) => Boolean(row.category));
+                const hasClubCol =
+                  !hasCategoryCol &&
+                  tournament.standings.some((row) => Boolean(row.club) && row.club !== '-');
+                const hasResCol = tournament.standings.some((row) => row.res !== undefined);
+                const hasRatingDeltaCol =
+                  hasResCol ||
+                  hasClubCol ||
+                  tournament.standings.some((row) => row.ratingChange !== 0);
+
+                return (
+                  <div className="overflow-hidden rounded-md border border-slate-200">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[960px] border-collapse text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
+                            <th scope="col" className="w-12 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              Rank
+                            </th>
+                            <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              S. No.
+                            </th>
+                            <th scope="col" className="min-w-[265px] px-3 py-2.5 text-center whitespace-nowrap">
+                              Name
+                            </th>
+                            <th scope="col" className="w-16 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              Rating
+                            </th>
+                            <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              FED
+                            </th>
+                            {hasCategoryCol && (
+                              <th scope="col" className="w-20 px-2.5 py-2.5 text-center whitespace-nowrap">
+                                Category
+                              </th>
+                            )}
+                            {hasClubCol && (
+                              <th scope="col" className="px-3 py-2.5 text-center whitespace-nowrap">
+                                Club
+                              </th>
+                            )}
+                            <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              Pts.
+                            </th>
+                            <th scope="col" className="w-12 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              {hasResCol ? 'Res.' : 'DE'}
+                            </th>
+                            <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              BH
+                            </th>
+                            <th scope="col" className="w-16 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              SB
+                            </th>
+                            <th scope="col" className="w-14 px-2.5 py-2.5 text-center whitespace-nowrap">
+                              PS
+                            </th>
+                            {hasRatingDeltaCol && (
+                              <th scope="col" className="w-20 px-2.5 py-2.5 text-center whitespace-nowrap">
+                                Rating +/-
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {tournament.standings.map((row) => {
+                            const { displayName, masterTitle } = getPlayerDisplayParts(
+                              row.name,
+                              athletes,
+                              row.title
+                            );
+                            return (
+                              <tr
+                                key={`${row.rank}-${row.sNo ?? '-'}-${row.name}`}
+                                className="hover:bg-slate-50"
                               >
-                                {displayName}
-                              </button>
-                            </div>
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
-                            {row.rating ?? '-'}
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-600">
-                            {row.fed ?? '-'}
-                          </td>
-                          <td className="px-2.5 py-2 text-center text-slate-700 whitespace-nowrap">
-                            {row.category ?? '-'}
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center font-extrabold text-[#0F2342]">
-                            {row.pointsDisplay ?? row.points.toFixed(1)}
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-600">
-                            {row.de ?? 0}
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
-                            {row.bhDisplay ?? row.buchholz.toFixed(1)}
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
-                            {row.sb ?? '-'}
-                          </td>
-                          <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
-                            {row.ps ?? '-'}
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center font-bold text-[#0F2342]">
+                                  {row.rank}
+                                </td>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-600">
+                                  {row.sNo ?? '-'}
+                                </td>
+                                <td className="min-w-[265px] px-3 py-2 font-semibold text-slate-900 whitespace-nowrap">
+                                  <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                    {masterTitle && <TitleBadge title={masterTitle} />}
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectAthlete(row.name, tournament.id)}
+                                      className="text-left font-semibold text-slate-900 whitespace-nowrap hover:text-[#0F2342] hover:underline"
+                                    >
+                                      {displayName}
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
+                                  {row.rating ?? '-'}
+                                </td>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-600">
+                                  {row.fed ?? '-'}
+                                </td>
+                                {hasCategoryCol && (
+                                  <td className="px-2.5 py-2 text-center text-slate-700 whitespace-nowrap">
+                                    {row.category ?? '-'}
+                                  </td>
+                                )}
+                                {hasClubCol && (
+                                  <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                                    {row.club ?? '-'}
+                                  </td>
+                                )}
+                                <td className="font-mono-tabular px-2.5 py-2 text-center font-extrabold text-[#0F2342]">
+                                  {row.pointsDisplay ?? row.points.toFixed(1)}
+                                </td>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-600">
+                                  {hasResCol ? (row.res ?? 0) : (row.de ?? 0)}
+                                </td>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
+                                  {row.bhDisplay ?? row.buchholz.toFixed(1)}
+                                </td>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
+                                  {row.sb ?? '-'}
+                                </td>
+                                <td className="font-mono-tabular px-2.5 py-2 text-center text-slate-700">
+                                  {row.ps ?? '-'}
+                                </td>
+                                {hasRatingDeltaCol && (
+                                  <td
+                                    className={`font-mono-tabular px-2.5 py-2 text-center font-bold ${
+                                      row.ratingChange > 0
+                                        ? 'text-emerald-700'
+                                        : row.ratingChange < 0
+                                          ? 'text-[#B91C1C]'
+                                          : 'text-slate-600'
+                                    }`}
+                                  >
+                                    {formatRatingDelta(row.ratingChange)}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()
             ) : (
               <div className="overflow-hidden rounded-md border border-slate-200">
                 <div className="overflow-x-auto">

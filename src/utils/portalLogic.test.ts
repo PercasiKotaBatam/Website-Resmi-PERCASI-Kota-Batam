@@ -41,6 +41,7 @@ import {
 } from './portalLogic';
 import {
   DARWIN_CUP_INITIAL_RANKINGS,
+  DARWIN_CUP_STANDINGS,
   FIRDAUS_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_ROUND_1_PAIRINGS,
   FIRDAUS_CUP_ROUND_2_PAIRINGS,
@@ -905,10 +906,12 @@ test('Kepri city options, athlete city filtering, and location formatting work a
   assert.equal(godfrid.district, 'Sagulung');
 
   const tpiList = filterAthletes(SEED_ATHLETES, { city: 'Tanjung Pinang' });
-  assert.equal(tpiList.length, 6);
+  assert.equal(tpiList.length, 8);
   assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'yanurisman candra'));
   assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'bharata surya dharma'));
   assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'yan vitra'));
+  assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'jack mamba'));
+  assert.ok(tpiList.some((a) => normalizeAthleteName(a.fullName) === 'takwin saleh'));
 
   const bintanList = filterAthletes(SEED_ATHLETES, { city: 'Bintan' });
   assert.equal(bintanList.length, 4);
@@ -917,7 +920,7 @@ test('Kepri city options, athlete city filtering, and location formatting work a
   assert.equal(linggaList.length, 1);
 
   const searchTpi = filterAthletes(SEED_ATHLETES, { query: 'tanjung pinang' });
-  assert.equal(searchTpi.length, 6);
+  assert.equal(searchTpi.length, 8);
 
   const profileTpi = buildAthleteDetailProfile('Yanurisman Candra', SEED_ATHLETES, SEED_TOURNAMENTS);
   assert.equal(profileTpi.city, 'Tanjung Pinang');
@@ -1363,7 +1366,117 @@ test('migratePortalData preserves custom Excel-uploaded initialRankings with <14
   assert.equal(firdaus?.initialRankings?.[0]?.name, 'Excel Test Grandmaster');
   assert.equal(darwin?.initialRankings?.length, 3);
   assert.equal(darwin?.initialRankings?.[0]?.name, 'Excel Test Grandmaster');
-  assert.equal(darwin?.participantsCount, 3);
+  assert.equal(darwin?.participantsCount, 148);
 });
+
+test('Darwin Cup 2026 Klasemen Akhir matches 148-row Swiss-Manager table, parses Res./Club/Rating +/-, and backfills empty cached standings', () => {
+  assert.equal(DARWIN_CUP_STANDINGS.length, 148);
+  const darwinTournament = SEED_TOURNAMENTS.find((t) => t.id === 'trn-darwin-cup-2026');
+  assert.ok(darwinTournament);
+  assert.equal(darwinTournament.status, 'Selesai');
+  assert.equal(darwinTournament.standings.length, 148);
+  assert.equal(darwinTournament.participantsCount, 148);
+
+  const uniqueSeeds = new Set(DARWIN_CUP_STANDINGS.map((row) => row.sNo));
+  assert.equal(uniqueSeeds.size, 148);
+  for (let s = 1; s <= 148; s += 1) {
+    assert.ok(uniqueSeeds.has(s), `Expected S. No. ${s} in DARWIN_CUP_STANDINGS`);
+  }
+
+  assert.deepEqual(DARWIN_CUP_STANDINGS[0], {
+    rank: 1,
+    sNo: 6,
+    title: 'Non-Gelar',
+    name: 'Jon Toni',
+    club: 'Sagulung',
+    rating: 1892,
+    fed: 'INA',
+    points: 5,
+    pointsDisplay: '5',
+    res: 0,
+    buchholz: 24,
+    bhDisplay: '24',
+    sb: '19,00',
+    ps: 20,
+    ratingChange: 0,
+  });
+  assert.equal(DARWIN_CUP_STANDINGS[2]?.name, 'Yanurisman Candra');
+  assert.equal(DARWIN_CUP_STANDINGS[2]?.pointsDisplay, '4½');
+  assert.equal(DARWIN_CUP_STANDINGS[2]?.sb, '14,25');
+  assert.equal(DARWIN_CUP_STANDINGS[5]?.name, 'Sahat Sitanggang');
+  assert.equal(DARWIN_CUP_STANDINGS[5]?.title, 'NM');
+  assert.equal(DARWIN_CUP_STANDINGS[31]?.name, 'Suhandri');
+  assert.equal(DARWIN_CUP_STANDINGS[31]?.title, 'MP');
+  assert.equal(DARWIN_CUP_STANDINGS[32]?.name, 'Nurdin Simanjuntak');
+  assert.equal(DARWIN_CUP_STANDINGS[32]?.title, 'NM');
+  assert.equal(DARWIN_CUP_STANDINGS[109]?.rank, 109);
+  assert.equal(DARWIN_CUP_STANDINGS[109]?.sNo, 43);
+  assert.equal(DARWIN_CUP_STANDINGS[109]?.name, 'Dr. Zamila Asrul');
+  assert.equal(DARWIN_CUP_STANDINGS[109]?.fed, 'ina');
+  assert.equal(DARWIN_CUP_STANDINGS[109]?.club, 'kodaeral IV');
+  assert.equal(DARWIN_CUP_STANDINGS[114]?.rank, 115);
+  assert.equal(DARWIN_CUP_STANDINGS[114]?.sNo, 141);
+  assert.equal(DARWIN_CUP_STANDINGS[114]?.name, 'Wahyu Rizky Pratama');
+  assert.equal(DARWIN_CUP_STANDINGS[114]?.pointsDisplay, '½');
+  assert.equal(DARWIN_CUP_STANDINGS[115]?.rank, 116);
+  assert.equal(DARWIN_CUP_STANDINGS[115]?.sNo, 1);
+  assert.equal(DARWIN_CUP_STANDINGS[115]?.name, 'Godfrid Harry Mollyson Siregar');
+  assert.equal(DARWIN_CUP_STANDINGS[115]?.title, 'NM');
+  assert.equal(DARWIN_CUP_STANDINGS[115]?.rating, 2243);
+  assert.equal(DARWIN_CUP_STANDINGS[147]?.rank, 147);
+  assert.equal(DARWIN_CUP_STANDINGS[147]?.sNo, 103);
+  assert.equal(DARWIN_CUP_STANDINGS[147]?.name, 'Muhammad Rizky Alfariz');
+
+  // Alias linking check for Dr. Zamila Asrul -> Zamila Asrul
+  const zamilaProfile = buildAthleteDetailProfile('Dr. Zamila Asrul', SEED_ATHLETES, SEED_TOURNAMENTS);
+  assert.equal(zamilaProfile.fullName, 'Zamila Asrul');
+  assert.equal(zamilaProfile.standingsRecords.some((r) => r.tournamentId === 'trn-darwin-cup-2026' && r.rank === 109), true);
+
+  // Backfill empty cached Darwin Cup standings while keeping future custom standings edits
+  const legacyEmptyDarwin = {
+    ...SEED_PORTAL_DATA,
+    tournaments: SEED_PORTAL_DATA.tournaments.map((t) =>
+      t.id === 'trn-darwin-cup-2026'
+        ? { ...t, status: 'Sedang Berlangsung' as const, standings: [] }
+        : t
+    ),
+  };
+  const backfilled = migratePortalData(legacyEmptyDarwin);
+  const upgradedDarwin = backfilled.tournaments.find((t) => t.id === 'trn-darwin-cup-2026');
+  assert.equal(upgradedDarwin?.standings.length, 148);
+  assert.equal(upgradedDarwin?.status, 'Selesai');
+
+  const customStandingsDarwin = {
+    ...SEED_PORTAL_DATA,
+    tournaments: SEED_PORTAL_DATA.tournaments.map((t) =>
+      t.id === 'trn-darwin-cup-2026'
+        ? { ...t, standings: DARWIN_CUP_STANDINGS.slice(0, 5) }
+        : t
+    ),
+  };
+  const preservedStandings = migratePortalData(customStandingsDarwin);
+  assert.equal(preservedStandings.tournaments[1]?.standings.length, 5);
+
+  // Excel Swiss-Manager sheet with Club, Res., and Rating +/- columns
+  const darwinSheet = XLSX.utils.aoa_to_sheet([
+    ['Rank', 'S. No.', 'Name', 'Rating', 'FED', 'Club', 'Pts.', 'Res.', 'BH', 'SB', 'PS', 'Rating +/-'],
+    [1, 6, 'Jon Toni', 1892, 'INA', 'Sagulung', 5, 0, 24, '19,00', 20, '+12'],
+    [3, 3, 'Yanurisman Candra', 2026, 'INA', 'Kepri - Tanjung Pinang', '4½', 0, 21, '14,25', '17½', '-4'],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, darwinSheet, 'Klasemen');
+  const xlsxBytes = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  const parsed = parseStandingsExcelBuffer(xlsxBytes);
+  assert.equal(parsed.errors.length, 0);
+  assert.equal(parsed.standings.length, 2);
+  assert.equal(parsed.standings[0]?.club, 'Sagulung');
+  assert.equal(parsed.standings[0]?.res, 0);
+  assert.equal(parsed.standings[0]?.rating, 1892);
+  assert.equal(parsed.standings[0]?.ratingChange, 12);
+  assert.equal(parsed.standings[1]?.points, 4.5);
+  assert.equal(parsed.standings[1]?.pointsDisplay, '4½');
+  assert.equal(parsed.standings[1]?.ratingChange, -4);
+});
+
 
 

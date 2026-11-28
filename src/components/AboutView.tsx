@@ -1,26 +1,69 @@
 import { Building2, ExternalLink, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { DISTRICT_OPTIONS } from '../utils/portalLogic';
 
-const BOARD_MEMBERS = [
+const ADVISORY_GROUPS = [
   {
-    role: 'Ketua Umum Pengkot PERCASI Batam',
-    name: 'H. Irwan Syahputra, S.T.',
-    unit: 'Pimpinan Umum',
+    title: 'Pelindung',
+    members: ['Walikota', 'Wakil Walikota', 'Kapolres', 'Ketua DPRD', 'Dandim'],
   },
   {
-    role: 'Sekretaris Umum',
-    name: 'Drs. Ridwan Hakim',
-    unit: 'Sekretariat & Administrasi',
+    title: 'Dewan Penasehat',
+    members: [
+      'Suhandri, S.Pd., MP, PNP',
+      'Kombes Pol Drg. Muhammad Zakir',
+      'Letkol Laut Irwan Manalu',
+    ],
   },
   {
-    role: 'Ketua Bidang Pembinaan Prestasi',
-    name: 'NM Nurdin Simanjuntak',
-    unit: 'Puslatkot & Atlet Junior',
+    title: 'Dewan Pertimbangan',
+    members: ['Dohn Fredi Siregar', 'Abdul Hakim'],
+  },
+];
+
+const EXECUTIVE_BOARD = [
+  { role: 'Ketua', name: 'Niko Nixon Situmorang, S.H., M.H.' },
+  { role: 'Ketua Harian', name: 'Edison Saragih' },
+  { role: 'Wakil Ketua 1', name: 'Sahat Sitanggang, MN, PNP' },
+  { role: 'Wakil Ketua 2', name: 'Agusta Slamet' },
+  { role: 'Sekretaris', name: 'Muh Baihaqi' },
+  { role: 'Wakil Sekretaris 1', name: 'William Weekhai, AIM, DI, WNP' },
+  { role: 'Wakil Sekretaris', name: 'Yurika F. Angelia' },
+  { role: 'Bendahara', name: 'Endi Dariyusman' },
+  { role: 'Wakil Bendahara', name: 'Dendra Sitohang' },
+];
+
+const DIVISION_COORDINATORS = [
+  {
+    division: 'Hubungan Masyarakat',
+    members: ['Fahrizal', 'Juminto'],
   },
   {
-    role: 'Ketua Komisi Perwasitan & Rating',
-    name: 'WN Agus Kurniawan, FA',
-    unit: 'Sertifikasi & Swiss-Manager',
+    division: 'Komisi Disiplin',
+    members: ['Pandapotan Panjaitan'],
+  },
+  {
+    division: 'Pembinaan dan Prestasi',
+    members: ['Junny Purnama Khoh, S.Ak., AWP', 'Fachrizal'],
+  },
+  {
+    division: 'Atlet Disabilitas',
+    members: ['Fahrizal'],
+  },
+  {
+    division: 'Kajian Pengembangan',
+    members: ['Abdi Lisani Firdaus', 'Slamet Sugiarto', 'Ismail Yudi'],
+  },
+  {
+    division: 'Kesehatan',
+    members: ['Atlantika, S. Keb', 'Queen Agave Siregar, S. Keb, Ns.'],
+  },
+  {
+    division: 'Pertandingan dan Wasit',
+    members: ['Aldriyanto Syarif, WNM, PNP', 'Paraden Pakpahan, WNM', 'Henny Ginting, WNP'],
+  },
+  {
+    division: 'Sarana Perlengkapan',
+    members: ['Rizky Ritonga', 'Jon Toni', 'Mae Timbul'],
   },
 ];
 
@@ -64,26 +107,82 @@ export function AboutView() {
           </section>
 
           <section className="rounded-lg border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-bold text-[#0F2342]">
-              Susunan Pengurus Harian Periode 2024–2028
-            </h2>
-            <div className="mt-4 divide-y divide-slate-100">
-              {BOARD_MEMBERS.map((member) => (
-                <div
-                  key={member.role}
-                  className="flex flex-col justify-between gap-1 py-3 sm:flex-row sm:items-center"
-                >
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">
-                      {member.name}
-                    </p>
-                    <p className="text-xs text-slate-500">{member.role}</p>
+            <div className="border-b border-slate-100 pb-4">
+              <h2 className="text-lg font-bold text-[#0F2342]">
+                Susunan Pengurus Periode 2026-2030
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Lampiran SK Pengprov PERCASI Kepulauan Riau Nomor: 002/PERCASI-KEPRI/SK/VII/2026
+                (21 Juli 2026)
+              </p>
+            </div>
+
+            <div className="mt-5 space-y-6">
+              <div className="grid gap-4 sm:grid-cols-3">
+                {ADVISORY_GROUPS.map((group) => (
+                  <div
+                    key={group.title}
+                    className="rounded-md border border-slate-200 bg-slate-50/70 p-3.5"
+                  >
+                    <h3 className="text-xs font-bold tracking-wider text-[#B91C1C] uppercase">
+                      {group.title}
+                    </h3>
+                    <ul className="mt-2 space-y-1 text-xs font-semibold text-slate-800">
+                      {group.members.map((member) => (
+                        <li key={member} className="leading-relaxed">
+                          {member}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <span className="text-xs font-semibold text-[#0F2342]">
-                    {member.unit}
-                  </span>
+                ))}
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold tracking-wider text-[#0F2342] uppercase">
+                  Badan Pengurus
+                </h3>
+                <div className="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200">
+                  {EXECUTIVE_BOARD.map((item) => (
+                    <div
+                      key={item.role}
+                      className="flex flex-col justify-between gap-0.5 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-4"
+                    >
+                      <span className="text-xs font-semibold text-slate-500">
+                        {item.role}
+                      </span>
+                      <span className="text-sm font-bold text-slate-900 sm:text-right">
+                        {item.name}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold tracking-wider text-[#0F2342] uppercase">
+                  Koordinator Bidang
+                </h3>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  {DIVISION_COORDINATORS.map((item) => (
+                    <div
+                      key={item.division}
+                      className="rounded-md border border-slate-200 bg-white px-4 py-3"
+                    >
+                      <p className="text-xs font-bold text-[#0F2342]">
+                        {item.division}
+                      </p>
+                      <ul className="mt-1.5 space-y-0.5 text-xs text-slate-700">
+                        {item.members.map((member) => (
+                          <li key={member} className="font-medium">
+                            {member}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 

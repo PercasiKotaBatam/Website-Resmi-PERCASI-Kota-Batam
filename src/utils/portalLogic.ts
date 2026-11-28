@@ -618,6 +618,7 @@ export function parseStandingsMatrix(rows: unknown[][]): StandingsParseResult {
     4
   );
   const deIdx = findExactOrPartialIdx(['de'], [], -1);
+  const resIdx = findExactOrPartialIdx(['res', 'result', 'hasil'], [], -1);
   const buchholzIdx = findExactOrPartialIdx(
     ['buchholz', 'bh', 'tb1', 'tb'],
     ['buchholz', 'tb1'],
@@ -625,11 +626,19 @@ export function parseStandingsMatrix(rows: unknown[][]): StandingsParseResult {
   );
   const sbIdx = findExactOrPartialIdx(['sb', 'sonnebornberger'], ['sb'], -1);
   const psIdx = findExactOrPartialIdx(['ps', 'progressive'], [], -1);
-  const deltaIdx = findExactOrPartialIdx(
-    ['perubahan', 'perubahanrating', 'ratingchange', 'delta', 'chg'],
-    ['perubahan', 'ratingchange', 'delta', 'chg'],
-    6
-  );
+  const rawDeltaColIdx = hasHeaderRow
+    ? nonEmptyRows[headerRowIdx].findIndex((cell) =>
+        /\+\/-/.test(String(cell ?? ''))
+      )
+    : -1;
+  const deltaIdx =
+    rawDeltaColIdx >= 0
+      ? rawDeltaColIdx
+      : findExactOrPartialIdx(
+          ['perubahan', 'perubahanrating', 'ratingchange', 'delta', 'chg'],
+          ['perubahan', 'ratingchange', 'delta', 'chg'],
+          6
+        );
   const idIdx = findExactOrPartialIdx(
     ['percasiid', 'idpercasi', 'fideid', 'id'],
     ['percasiid', 'idpercasi'],
@@ -727,6 +736,10 @@ export function parseStandingsMatrix(rows: unknown[][]): StandingsParseResult {
     if (deIdx >= 0) {
       const parsedDe = Number.parseInt(String(cols[deIdx] ?? '').trim(), 10);
       if (!Number.isNaN(parsedDe)) entry.de = parsedDe;
+    }
+    if (resIdx >= 0) {
+      const parsedRes = Number.parseInt(String(cols[resIdx] ?? '').trim(), 10);
+      if (!Number.isNaN(parsedRes)) entry.res = parsedRes;
     }
     if (sbIdx >= 0) {
       const sbRaw = String(cols[sbIdx] ?? '').trim();
@@ -1731,6 +1744,7 @@ const ATHLETE_NAME_ALIASES: Record<string, string> = {
   'isma yudi': 'ismail yudi',
   'bharata dharma surya': 'bharata surya dharma',
   'yan fitra': 'yan vitra',
+  'dr. zamila asrul': 'zamila asrul',
 };
 
 export const MASTER_PLAYER_TITLE_CODES = new Set([

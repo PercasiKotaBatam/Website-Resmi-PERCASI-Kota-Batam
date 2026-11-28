@@ -114,6 +114,7 @@ export interface StandingEntry {
   points: number;
   pointsDisplay?: string;
   de?: number;
+  res?: number;
   buchholz: number;
   bhDisplay?: string;
   sb?: number | string;

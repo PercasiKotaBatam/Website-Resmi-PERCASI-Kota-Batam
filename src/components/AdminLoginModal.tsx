@@ -1,7 +1,11 @@
-import { Cloud, Eye, EyeOff, KeyRound, RotateCcw, ShieldCheck, X } from 'lucide-react';
+import { Check, Cloud, Copy, ExternalLink, Eye, EyeOff, KeyRound, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import { BOOTSTRAPPED_ADMIN_EMAIL, signInWithGoogleAdmin } from '../utils/firebase';
+import {
+  BOOTSTRAPPED_ADMIN_EMAIL,
+  FIREBASE_PROJECT_ID,
+  signInWithGoogleAdmin,
+} from '../utils/firebase';
 import {
   clearStaticAdmin,
   hasStaticAdminClaimed,
@@ -37,11 +41,15 @@ export function AdminLoginModal({
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     setError('');
+    setErrorCode('');
+    setCopiedDomain(false);
     setPassword('');
     setConfirmPassword('');
     setShowPassword(false);
@@ -99,11 +107,14 @@ export function AdminLoginModal({
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setErrorCode('');
+    setCopiedDomain(false);
     setGoogleSubmitting(true);
     try {
       const result = await signInWithGoogleAdmin();
       if (result.ok === false) {
         setError(result.error);
+        setErrorCode(result.code ?? '');
         return;
       }
       onSuccess(
@@ -114,6 +125,20 @@ export function AdminLoginModal({
       onClose();
     } finally {
       setGoogleSubmitting(false);
+    }
+  };
+
+  const currentHostname =
+    typeof window !== 'undefined' ? window.location.hostname : 'percasikotabatam.github.io';
+  const firebaseAuthSettingsUrl = `https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/settings`;
+
+  const handleCopyDomain = async () => {
+    try {
+      await navigator.clipboard.writeText(currentHostname);
+      setCopiedDomain(true);
+      window.setTimeout(() => setCopiedDomain(false), 2500);
+    } catch {
+      // Ignore clipboard permission errors
     }
   };
 
@@ -267,6 +292,45 @@ export function AdminLoginModal({
                     : 'Masuk dengan Google Admin'}
                 </span>
               </button>
+
+              {errorCode === 'auth/unauthorized-domain' && (
+                <div className="mt-3 space-y-2 rounded-md border border-amber-300 bg-white p-3 text-[11px] text-slate-700">
+                  <p className="font-bold text-[#0F2342]">
+                    Cara Mengaktifkan Login Google di {currentHostname}:
+                  </p>
+                  <ol className="list-decimal space-y-1 pl-4 leading-relaxed">
+                    <li>
+                      Salin domain <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px] font-bold">{currentHostname}</code>.
+                    </li>
+                    <li>
+                      Buka Firebase Console → <strong>Authentication → Settings → Authorized domains → Add domain</strong>, lalu tempel domain tersebut.
+                    </li>
+                  </ol>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyDomain()}
+                      className="inline-flex h-8 items-center gap-1.5 rounded border border-slate-300 bg-slate-50 px-2.5 text-[11px] font-semibold text-slate-800 hover:bg-slate-100"
+                    >
+                      {copiedDomain ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-700" aria-hidden="true" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      <span>{copiedDomain ? 'Domain Tersalin' : `Salin ${currentHostname}`}</span>
+                    </button>
+                    <a
+                      href={firebaseAuthSettingsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-8 items-center gap-1.5 rounded bg-emerald-700 px-3 text-[11px] font-bold text-white hover:bg-emerald-800"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>Buka Pengaturan Firebase</span>
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="relative flex items-center py-1">

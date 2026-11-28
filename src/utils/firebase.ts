@@ -26,6 +26,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import type { Athlete, NewsArticle, PortalData, Tournament } from '../types/chess';
 
 export const BOOTSTRAPPED_ADMIN_EMAIL = 'percasikotabatam01@gmail.com';
+export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);

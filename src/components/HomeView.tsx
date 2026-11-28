@@ -751,7 +751,9 @@ export function HomeView({
                     <p className="flex items-center gap-2">
                       <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />
                       <span>
-                        {trn.startDate} – {trn.endDate}
+                        {trn.startDate === trn.endDate
+                          ? trn.startDate
+                          : `${trn.startDate} – ${trn.endDate}`}
                       </span>
                     </p>
                     <p className="flex items-center gap-2">

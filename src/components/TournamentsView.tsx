@@ -228,7 +228,7 @@ export function TournamentsView({
                                   </button>
                                 </div>
                                 <span className="font-mono-tabular font-bold text-[#0F2342] shrink-0">
-                                  {entry.points.toFixed(1)} pts
+                                  {entry.pointsDisplay ?? entry.points.toFixed(1)} pts
                                 </span>
                               </div>
                             );

@@ -1,5 +1,6 @@
 import {
   DARWIN_CUP_INITIAL_RANKINGS,
+  DARWIN_CUP_STANDINGS,
   FIRDAUS_CUP_INITIAL_RANKINGS,
   FIRDAUS_CUP_ROUND_1_PAIRINGS,
   FIRDAUS_CUP_ROUND_2_PAIRINGS,
@@ -161,13 +162,29 @@ export function migratePortalData(data: PortalData): PortalData {
         const resolvedInitial = needsDarwinInitialUpgrade
           ? DARWIN_CUP_INITIAL_RANKINGS
           : enrichInitialRankingsMasterTitles(t.initialRankings!, mergedAthletes);
+        const needsDarwinStandingsUpgrade = safeStandings.length === 0;
+        const resolvedStandings = needsDarwinStandingsUpgrade
+          ? DARWIN_CUP_STANDINGS
+          : safeStandings;
         return {
           ...t,
-          participantsCount: needsDarwinInitialUpgrade
-            ? Math.max(t.participantsCount || 0, DARWIN_CUP_INITIAL_RANKINGS.length)
-            : Math.max(resolvedInitial.length, safeStandings.length),
+          status:
+            needsDarwinStandingsUpgrade && t.status !== 'Selesai'
+              ? ('Selesai' as const)
+              : t.status,
+          description:
+            needsDarwinStandingsUpgrade &&
+            t.description ===
+              'Daftar peserta dan peringkat awal resmi turnamen Darwin Cup 2026.'
+              ? 'Klasemen akhir dan daftar peringkat awal resmi turnamen Darwin Cup 2026.'
+              : t.description,
+          participantsCount: Math.max(
+            needsDarwinInitialUpgrade ? DARWIN_CUP_INITIAL_RANKINGS.length : 0,
+            resolvedInitial.length,
+            resolvedStandings.length
+          ),
           initialRankings: resolvedInitial,
-          standings: safeStandings,
+          standings: resolvedStandings,
           pairings: safePairings,
         };
       }
